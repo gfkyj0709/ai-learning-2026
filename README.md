@@ -4,13 +4,13 @@
 
 ---
 
-## Phase 1 - Week 1: LLM 기초 + Spring Boot 연동
+## Phase 1 - Spring Boot + Spring Cloud + Ollama 연동
 
 **학습 기간:** 2026년 3월
 
 ### 학습 목표
 
-로컬 LLM 환경을 직접 구축하고, Spring Boot와 연동하여 실제 동작하는 AI 백엔드를 만든다.
+로컬 LLM 환경을 직접 구축하고, Spring Boot + Spring Cloud MSA 구조와 연동하여 실제 동작하는 AI 백엔드를 만든다.
 
 ---
 
@@ -128,20 +128,6 @@ public ChatResponse chat(@RequestBody ChatRequest request) {
 
 ---
 
-### 기술 스택
-
-| 항목 | 버전 |
-|------|------|
-| Java | 21 |
-| Spring Boot | 3.4.3 |
-| Spring AI | 1.0.0 |
-| Build Tool | Maven |
-| LLM Runtime | Ollama |
-| LLM Model | qwen2.5 |
-| 인프라 | Proxmox VE + Ubuntu Server VM |
-
----
-
 ### 6. Docker 기초 — 이미지, 컨테이너, Dockerfile
 
 Docker의 핵심 개념을 이해하고 멀티 스테이지 빌드로 최적화된 Spring Boot 이미지를 만들었다.
@@ -224,16 +210,19 @@ docker compose down
 - 환경변수로 `SPRING_AI_OLLAMA_BASE_URL`을 주입하면 application.yml을 수정하지 않고도 환경별로 설정을 분리할 수 있다
 - `restart: unless-stopped`로 VM 재부팅 시 자동으로 컨테이너가 되살아난다
 - Linux에서는 `host.docker.internal`이 동작 안 해서 VM IP를 직접 사용했다
+
 ---
 
-### 8. Spring Cloud Gateway — MSA 라우팅 데모
+### 8. Spring Cloud MSA 실습
 
-Spring Cloud Gateway를 API 게이트웨이로 구성해 단일 진입점에서 여러 서비스로 라우팅하는 MSA 구조를 실습했다. Maven 멀티모듈 프로젝트로 구성해 서비스 간 빌드를 한 번에 관리한다.
+Spring Cloud 전체 컴포넌트를 Maven 멀티모듈 프로젝트로 구성해 MSA 구조를 직접 구현했다.
 
 #### 서비스 구성
 
 | 서비스 | 포트 | 역할 |
 |--------|------|------|
+| eureka-server | 8761 | 서비스 디스커버리 — 서비스 등록 및 주소 관리 |
+| config-server | 8888 | 중앙 설정 관리 — 모든 서비스 설정을 한 곳에서 제공 |
 | gateway | 8084 | API 게이트웨이 — 단일 진입점, 라우팅 처리 |
 | user-service | 8081 | 사용자 도메인 API (`GET /users`) |
 | product-service | 8082 | 상품 도메인 API (`GET /products`) |
@@ -243,69 +232,161 @@ Spring Cloud Gateway를 API 게이트웨이로 구성해 단일 진입점에서 
 ```
 phase1/spring-cloud-demo/
 ├── pom.xml                  # 루트 POM (모듈 목록 정의)
-├── gateway/
-│   ├── pom.xml
-│   └── src/main/resources/application.yml
-├── user-service/
-│   ├── pom.xml
-│   └── src/main/java/.../UserController.java
-└── product-service/
-    ├── pom.xml
-    └── src/main/java/.../ProductController.java
+├── eureka-server/           # 서비스 디스커버리
+├── config-server/           # 중앙 설정 관리
+│   └── src/main/resources/
+│       ├── application.yml
+│       └── config/
+│           ├── user-service.yml
+│           └── product-service.yml
+├── gateway/                 # API 게이트웨이
+├── user-service/            # 사용자 서비스
+└── product-service/         # 상품 서비스
 ```
 
-루트 `pom.xml`에서 모든 서비스를 모듈로 선언한다.
+#### 8-1. Spring Cloud Gateway — API 라우팅
 
-```xml
-<modules>
-  <module>gateway</module>
-  <module>user-service</module>
-  <module>product-service</module>
-</modules>
-```
-
-#### 게이트웨이 라우팅 설정 (`gateway/application.yml`)
+게이트웨이 라우팅 설정 (`gateway/application.yml`):
 
 ```yaml
-server:
-  port: 8084
-
 spring:
   cloud:
     gateway:
       routes:
         - id: user-service
-          uri: http://localhost:8081
+          uri: lb://user-service       # Eureka 로드밸런싱
           predicates:
             - Path=/users/**
 
         - id: product-service
-          uri: http://localhost:8082
+          uri: lb://product-service
           predicates:
             - Path=/products/**
 ```
 
-경로 prefix를 그대로 백엔드에 전달하므로 `StripPrefix` 필터가 필요 없다. 각 서비스의 컨트롤러 경로를 게이트웨이 경로와 일치시키는 방식이다.
+**학습 포인트:**
+- 클라이언트는 게이트웨이 포트(8084) 하나만 알면 된다
+- `lb://` 접두사로 Eureka 서비스 디스커버리와 자동 연동된다
+- 인증·로깅·CORS 같은 공통 관심사를 한 곳에서 처리하기 좋은 위치다
 
-#### 실제 테스트 curl 명령어
+#### 8-2. Spring Cloud Eureka — 서비스 디스커버리
 
-```bash
-# user-service 직접 호출 (8081)
-curl http://localhost:8081/users
-
-# product-service 직접 호출 (8082)
-curl http://localhost:8082/products
-
-# 게이트웨이(8084)를 통한 라우팅 — 결과는 위와 동일
-curl http://localhost:8084/users
-curl http://localhost:8084/products
+```yaml
+# 각 서비스 application.yml
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
 ```
 
 **학습 포인트:**
-- 클라이언트는 게이트웨이 포트(8084) 하나만 알면 된다. 백엔드 서비스가 추가·변경돼도 클라이언트 코드는 바뀌지 않는다
-- Maven 멀티모듈을 사용하면 루트에서 `mvn package`만 실행해도 모든 서비스가 한 번에 빌드된다
-- 라우팅 규칙을 YAML로 선언적으로 관리하므로, 새 서비스를 추가할 때 코드 없이 설정만 추가하면 된다
-- 게이트웨이는 인증·로깅·CORS 같은 공통 관심사를 한 곳에서 처리하기 좋은 위치다 (이번 실습에서는 순수 라우팅만 구현)
+- 서비스가 시작되면 Eureka에 자동 등록, 종료되면 자동 해제된다
+- Gateway가 `lb://서비스명`으로 Eureka에서 실제 주소를 조회해 라우팅한다
+- Eureka 대시보드: `http://localhost:8761`
+
+#### 8-3. Spring Cloud OpenFeign — 서비스 간 통신
+
+인터페이스 선언만으로 다른 마이크로서비스를 호출할 수 있다.
+
+```java
+// URL 없이 인터페이스 선언만으로 서비스 간 통신
+@FeignClient(name = "user-service")  // Eureka에서 주소 자동 조회
+public interface UserClient {
+    @GetMapping("/users/{id}")
+    Map<String, Object> getUser(@PathVariable int id);
+}
+```
+
+```bash
+# product-service가 user-service를 호출해 데이터를 합쳐서 반환
+curl http://localhost:8084/products/1/detail
+# → {"product": {...}, "manager": {"id":1, "name":"User-1", "email":"user1@example.com"}}
+```
+
+**학습 포인트:**
+- `RestTemplate` 방식 대비 URL 조합, 타입 변환, 예외 처리 코드가 사라진다
+- JPA Repository처럼 인터페이스 선언만 하면 동작한다
+- Eureka와 연동되어 서비스 IP가 바뀌어도 코드 수정이 필요 없다
+
+#### 8-4. Spring Cloud Config Server — 중앙 설정 관리
+
+모든 서비스의 `application.yml` 설정을 Config Server 한 곳에서 관리한다.
+
+```yaml
+# config-server/application.yml
+spring:
+  profiles:
+    active: native
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: classpath:/config   # 로컬 파일 시스템 방식
+```
+
+```yaml
+# 각 서비스 application.yml — Config Server에서 설정 가져오기
+spring:
+  config:
+    import: "configserver:http://localhost:8888"
+```
+
+```bash
+# Config Server에서 설정 조회 API
+curl http://localhost:8888/user-service/default
+curl http://localhost:8888/product-service/default
+```
+
+**학습 포인트:**
+- 서비스 시작 시 Config Server에서 설정을 자동으로 가져온다
+- 로컬 파일 시스템 외에 GitHub/GitLab 저장소 연동도 가능하다
+- `Spring Cloud Bus` + `/actuator/refresh` 조합 시 서비스 재시작 없이 설정 반영 가능 (Phase 2에서 실습 예정)
+
+#### 8-5. Spring Cloud Resilience4j — Circuit Breaker (장애 대응)
+
+연쇄 장애를 방지한다. 하나의 서비스 다운 시 전체 서비스 장애로 번지는 것을 차단한다.
+
+```java
+@GetMapping("/{id}/detail")
+@CircuitBreaker(name = "userService", fallbackMethod = "getProductDetailFallback")
+public Map<String, Object> getProductDetail(@PathVariable int id) {
+    Map<String, Object> user = userClient.getUser(id);  // user-service 호출
+    // ...
+}
+
+// user-service 다운 시 fallback 반환
+public Map<String, Object> getProductDetailFallback(@PathVariable int id, Exception e) {
+    return Map.of("manager", Map.of("id", 0, "name", "Unknown User", "email", "unknown@fallback.com"));
+}
+```
+
+```bash
+# user-service를 종료한 상태에서 호출해도 정상 응답
+curl http://localhost:8084/products/1/detail
+# → {"product": {...}, "manager": {"id":0, "name":"Unknown User", "email":"unknown@fallback.com"}}
+```
+
+**학습 포인트:**
+- `@CircuitBreaker` 어노테이션 하나로 장애 대응 로직을 분리할 수 있다
+- user-service가 다운돼도 product-service는 정상 동작을 유지한다
+- FDS AI Assistant에서 외부 AI 서비스 장애 시 graceful degradation에 활용 예정
+
+---
+
+### 기술 스택
+
+| 항목 | 버전 |
+|------|------|
+| Java | 21 |
+| Spring Boot | 3.4.3 |
+| Spring AI | 1.0.0 |
+| Spring Cloud | 2024.x |
+| Build Tool | Maven |
+| LLM Runtime | Ollama |
+| LLM Model | qwen2.5 |
+| 인프라 | Proxmox VE + Ubuntu Server VM |
 
 ---
 
@@ -324,9 +405,11 @@ curl http://localhost:8084/products
 ```
 ai-learning-2026/
 └── phase1/
-    ├── spring-ollama/       # Week 1: Spring Boot + Ollama 연동 (Docker Compose 포함)
-    └── spring-cloud-demo/   # Week 1: Spring Cloud Gateway MSA 라우팅 데모 (Maven 멀티모듈)
-        ├── gateway/         #   ├── API 게이트웨이 (포트 8084)
-        ├── user-service/    #   ├── 사용자 서비스 (포트 8081)
-        └── product-service/ #   └── 상품 서비스 (포트 8082)
+    ├── spring-ollama/            # Spring Boot + Ollama 연동 (Docker Compose 포함)
+    └── spring-cloud-demo/        # Spring Cloud MSA 전체 실습 (Maven 멀티모듈)
+        ├── eureka-server/        #   ├── 서비스 디스커버리 (포트 8761)
+        ├── config-server/        #   ├── 중앙 설정 관리 (포트 8888)
+        ├── gateway/              #   ├── API 게이트웨이 (포트 8084)
+        ├── user-service/         #   ├── 사용자 서비스 (포트 8081)
+        └── product-service/      #   └── 상품 서비스 (포트 8082)
 ```
