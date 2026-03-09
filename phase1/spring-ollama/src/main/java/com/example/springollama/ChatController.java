@@ -2,9 +2,11 @@ package com.example.springollama;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
 
 @RestController
 public class ChatController {
@@ -23,6 +25,15 @@ public class ChatController {
                 .call()
                 .content();
         return new ChatResponse(answer);
+    }
+
+    @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> stream(@RequestBody ChatRequest request) {
+        return chatClient.prompt()
+                .system("너는 Java 백엔드 개발 전문가야. 친절하고 간결하게 한국어로 답변해줘.")
+                .user(request.message())
+                .stream()
+                .content();
     }
 
     record ChatRequest(@JsonProperty("message") String message) {}
