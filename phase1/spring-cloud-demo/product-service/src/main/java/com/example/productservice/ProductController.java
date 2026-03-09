@@ -1,5 +1,6 @@
 package com.example.productservice;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -40,6 +41,7 @@ public class ProductController {
     }
 
     @GetMapping("/{id}/detail")
+    @CircuitBreaker(name = "user-service", fallbackMethod = "getProductDetailFallback")
     public Map<String, Object> getProductDetail(@PathVariable int id) {
         Map<String, Object> product = Map.of("id", id, "name", "Product-" + id, "price", id * 100, "managerId", id);
         Map<String, Object> user = userClient.getUser(id);
@@ -47,6 +49,17 @@ public class ProductController {
         Map<String, Object> result = new HashMap<>();
         result.put("product", product);
         result.put("manager", user);
+        return result;
+    }
+
+    // Circuit Breaker fallback - user-service 호출 실패 시 실행
+    public Map<String, Object> getProductDetailFallback(int id, Throwable t) {
+        Map<String, Object> product = Map.of("id", id, "name", "Product-" + id, "price", id * 100, "managerId", id);
+        Map<String, Object> unknownUser = Map.of("id", 0, "name", "Unknown User", "email", "unknown@fallback.com");
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("product", product);
+        result.put("manager", unknownUser);
         return result;
     }
 

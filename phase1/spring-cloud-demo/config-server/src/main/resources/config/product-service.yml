@@ -8,6 +8,26 @@ eureka:
   instance:
     prefer-ip-address: true
 
+spring:
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true   # Feign + Resilience4j Circuit Breaker 활성화
+
+# Circuit Breaker 동작 설정
+resilience4j:
+  circuitbreaker:
+    instances:
+      user-service:
+        sliding-window-size: 10          # 최근 10회 호출 기준으로 판단
+        failure-rate-threshold: 50       # 50% 이상 실패 시 OPEN
+        wait-duration-in-open-state: 10s # OPEN 후 10초 대기 후 HALF-OPEN 전환
+        permitted-number-of-calls-in-half-open-state: 3
+  timelimiter:
+    instances:
+      user-service:
+        timeout-duration: 3s            # 3초 초과 시 실패로 간주
+
 # product-service 커스텀 설정
 product:
   currency: "USD"
