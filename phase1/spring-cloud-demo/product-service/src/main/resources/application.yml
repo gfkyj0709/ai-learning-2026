@@ -1,13 +1,5 @@
-server:
-  port: 8082
-
 spring:
   application:
-    name: product-service
-
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/
-  instance:
-    prefer-ip-address: true
+    name: product-service  # Config Server에서 product-service.yml을 찾는 기준
+  config:
+    import: "configserver:http://localhost:8888"   # Config Server에서 설정 가져오기

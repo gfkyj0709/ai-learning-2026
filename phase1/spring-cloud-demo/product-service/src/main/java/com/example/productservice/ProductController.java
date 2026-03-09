@@ -1,5 +1,6 @@
 package com.example.productservice;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,6 +16,12 @@ public class ProductController {
 
     private final UserClient userClient;
 
+    @Value("${product.currency:KRW}")
+    private String currency;
+
+    @Value("${product.discount-rate:0.0}")
+    private double discountRate;
+
     public ProductController(UserClient userClient) {
         this.userClient = userClient;
     }
@@ -22,14 +29,14 @@ public class ProductController {
     @GetMapping
     public List<Map<String, Object>> getProducts() {
         return List.of(
-            Map.of("id", 1, "name", "Laptop",  "price", 1200),
-            Map.of("id", 2, "name", "Monitor", "price", 350)
+            Map.of("id", 1, "name", "Laptop",  "price", 1200, "currency", currency),
+            Map.of("id", 2, "name", "Monitor", "price", 350,  "currency", currency)
         );
     }
 
     @GetMapping("/{id}")
     public Map<String, Object> getProduct(@PathVariable int id) {
-        return Map.of("id", id, "name", "Product-" + id, "price", id * 100);
+        return Map.of("id", id, "name", "Product-" + id, "price", id * 100, "currency", currency);
     }
 
     @GetMapping("/{id}/detail")
@@ -41,5 +48,15 @@ public class ProductController {
         result.put("product", product);
         result.put("manager", user);
         return result;
+    }
+
+    // Config Server 설정값 확인용 엔드포인트
+    @GetMapping("/config")
+    public Map<String, Object> getConfig() {
+        return Map.of(
+            "currency", currency,
+            "discountRate", discountRate,
+            "source", "Spring Cloud Config Server"
+        );
     }
 }

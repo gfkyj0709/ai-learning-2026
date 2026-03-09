@@ -1,0 +1,19 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+  profiles:
+    active: native       # 로컬 파일 시스템 방식
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: classpath:/config   # src/main/resources/config/ 하위를 설정 저장소로 사용
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, env
