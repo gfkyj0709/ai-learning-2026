@@ -142,6 +142,16 @@ public ChatResponse chat(@RequestBody ChatRequest request) {
 
 ---
 
+## English Learning Log
+
+### 2026-03-09
+- [Fireship] Cloudflare + Next.js 관련 영상
+  - URL: https://www.youtube.com/watch?v=abbeIUOCzmw
+- [Hacker News] macOS + LLM 활용 관련 글
+  - URL: https://agent-safehouse.dev/
+
+---
+
 ## 저장소 구조
 
 ```
