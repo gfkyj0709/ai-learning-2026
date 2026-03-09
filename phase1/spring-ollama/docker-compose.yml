@@ -1,0 +1,7 @@
+services:
+  spring-ollama:
+    build: .
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_AI_OLLAMA_BASE_URL=http://192.168.219.102:11434
