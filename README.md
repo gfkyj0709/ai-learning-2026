@@ -142,6 +142,173 @@ public ChatResponse chat(@RequestBody ChatRequest request) {
 
 ---
 
+### 6. Docker 기초 — 이미지, 컨테이너, Dockerfile
+
+Docker의 핵심 개념을 이해하고 멀티 스테이지 빌드로 최적화된 Spring Boot 이미지를 만들었다.
+
+#### 핵심 개념
+
+| 개념 | 설명 |
+|------|------|
+| **Image** | 컨테이너 실행에 필요한 파일 시스템 스냅샷. 읽기 전용 레이어로 구성 |
+| **Container** | 이미지를 실행한 인스턴스. 격리된 프로세스로 동작 |
+| **Dockerfile** | 이미지를 빌드하는 명령어 스크립트 |
+| **멀티 스테이지 빌드** | 빌드 환경과 실행 환경을 분리해 최종 이미지 크기를 줄이는 기법 |
+
+#### 멀티 스테이지 Dockerfile 패턴
+
+```dockerfile
+# Stage 1: 빌드
+FROM eclipse-temurin:21-jdk AS builder
+WORKDIR /app
+COPY . .
+RUN ./mvnw package -DskipTests
+
+# Stage 2: 실행 (JRE만 포함해 이미지 최소화)
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY --from=builder /app/target/*.jar app.jar
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+
+**학습 포인트:**
+- 빌드 도구(JDK, Maven)는 최종 이미지에 포함할 필요가 없다
+- `COPY --from=builder`로 빌드 산출물만 런타임 이미지로 복사한다
+- JDK → JRE 전환만으로도 이미지 크기를 대폭 줄일 수 있다
+
+---
+
+### 7. Docker Compose — Spring Boot 컨테이너화
+
+Docker Compose로 Spring Boot 앱을 컨테이너화하고, Ollama와의 통신 방식을 결정하는 아키텍처 판단을 학습했다.
+
+#### Ollama는 VM 직접 설치, Spring Boot만 Docker로 운영하는 이유
+
+Ollama를 Docker 컨테이너로 올리지 않고 VM에 직접 설치한 이유는 두 가지다.
+
+1. **GPU 접근 문제**: Ollama가 GPU를 활용하려면 컨테이너에서 GPU 패스스루 설정이 필요해 복잡도가 높아진다. VM 직접 설치가 훨씬 단순하다.
+2. **LLM은 인프라, 앱은 서비스**: Ollama는 DB처럼 항상 떠 있는 인프라 레이어다. Spring Boot 앱만 컨테이너로 관리하면 배포·재시작 단위를 명확하게 분리할 수 있다.
+
+#### 실제 사용한 `docker-compose.yml`
+
+```yaml
+services:
+  spring-ollama:
+    build: .
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_AI_OLLAMA_BASE_URL=http://192.168.219.102:11434
+    restart: unless-stopped
+```
+
+#### 주요 명령어
+
+```bash
+# 이미지 빌드 후 컨테이너 실행
+docker compose up --build
+
+# 백그라운드 실행
+docker compose up -d
+
+# 로그 확인
+docker compose logs -f
+
+# 컨테이너 중지 및 삭제
+docker compose down
+```
+
+**학습 포인트:**
+- `host.docker.internal`은 컨테이너 내부에서 호스트 머신(VM)의 IP를 가리키는 특수 DNS 이름이다
+- Linux에서는 이 이름이 자동으로 해석되지 않아 `extra_hosts: host-gateway`를 명시해야 한다 (Mac은 불필요)
+- 환경변수로 `SPRING_AI_OLLAMA_BASE_URL`을 주입하면 application.yml을 수정하지 않고도 환경별로 설정을 분리할 수 있다
+- `restart: unless-stopped`로 VM 재부팅 시 자동으로 컨테이너가 되살아난다
+- Linux에서는 `host.docker.internal`이 동작 안 해서 VM IP를 직접 사용했다
+---
+
+### 8. Spring Cloud Gateway — MSA 라우팅 데모
+
+Spring Cloud Gateway를 API 게이트웨이로 구성해 단일 진입점에서 여러 서비스로 라우팅하는 MSA 구조를 실습했다. Maven 멀티모듈 프로젝트로 구성해 서비스 간 빌드를 한 번에 관리한다.
+
+#### 서비스 구성
+
+| 서비스 | 포트 | 역할 |
+|--------|------|------|
+| gateway | 8084 | API 게이트웨이 — 단일 진입점, 라우팅 처리 |
+| user-service | 8081 | 사용자 도메인 API (`GET /users`) |
+| product-service | 8082 | 상품 도메인 API (`GET /products`) |
+
+#### Maven 멀티모듈 구조
+
+```
+phase1/spring-cloud-demo/
+├── pom.xml                  # 루트 POM (모듈 목록 정의)
+├── gateway/
+│   ├── pom.xml
+│   └── src/main/resources/application.yml
+├── user-service/
+│   ├── pom.xml
+│   └── src/main/java/.../UserController.java
+└── product-service/
+    ├── pom.xml
+    └── src/main/java/.../ProductController.java
+```
+
+루트 `pom.xml`에서 모든 서비스를 모듈로 선언한다.
+
+```xml
+<modules>
+  <module>gateway</module>
+  <module>user-service</module>
+  <module>product-service</module>
+</modules>
+```
+
+#### 게이트웨이 라우팅 설정 (`gateway/application.yml`)
+
+```yaml
+server:
+  port: 8084
+
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: user-service
+          uri: http://localhost:8081
+          predicates:
+            - Path=/users/**
+
+        - id: product-service
+          uri: http://localhost:8082
+          predicates:
+            - Path=/products/**
+```
+
+경로 prefix를 그대로 백엔드에 전달하므로 `StripPrefix` 필터가 필요 없다. 각 서비스의 컨트롤러 경로를 게이트웨이 경로와 일치시키는 방식이다.
+
+#### 실제 테스트 curl 명령어
+
+```bash
+# user-service 직접 호출 (8081)
+curl http://localhost:8081/users
+
+# product-service 직접 호출 (8082)
+curl http://localhost:8082/products
+
+# 게이트웨이(8084)를 통한 라우팅 — 결과는 위와 동일
+curl http://localhost:8084/users
+curl http://localhost:8084/products
+```
+
+**학습 포인트:**
+- 클라이언트는 게이트웨이 포트(8084) 하나만 알면 된다. 백엔드 서비스가 추가·변경돼도 클라이언트 코드는 바뀌지 않는다
+- Maven 멀티모듈을 사용하면 루트에서 `mvn package`만 실행해도 모든 서비스가 한 번에 빌드된다
+- 라우팅 규칙을 YAML로 선언적으로 관리하므로, 새 서비스를 추가할 때 코드 없이 설정만 추가하면 된다
+- 게이트웨이는 인증·로깅·CORS 같은 공통 관심사를 한 곳에서 처리하기 좋은 위치다 (이번 실습에서는 순수 라우팅만 구현)
+
+---
+
 ## English Learning Log
 
 ### 2026-03-09
@@ -157,5 +324,9 @@ public ChatResponse chat(@RequestBody ChatRequest request) {
 ```
 ai-learning-2026/
 └── phase1/
-    └── spring-ollama/   # Week 1: Spring Boot + Ollama 연동
+    ├── spring-ollama/       # Week 1: Spring Boot + Ollama 연동 (Docker Compose 포함)
+    └── spring-cloud-demo/   # Week 1: Spring Cloud Gateway MSA 라우팅 데모 (Maven 멀티모듈)
+        ├── gateway/         #   ├── API 게이트웨이 (포트 8084)
+        ├── user-service/    #   ├── 사용자 서비스 (포트 8081)
+        └── product-service/ #   └── 상품 서비스 (포트 8082)
 ```
