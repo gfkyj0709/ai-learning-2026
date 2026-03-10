@@ -390,6 +390,146 @@ curl http://localhost:8084/products/1/detail
 
 ---
 
+## Phase 2 - RAG 구현 (선행 학습)
+
+**학습 기간:** 2026년 3월 (Phase 1 완료 후 선행 진행)
+
+### 학습 목표
+
+LangChain4j + Qdrant 벡터 DB를 활용해 RAG(Retrieval-Augmented Generation) 파이프라인을 직접 구현한다.
+FDS 문서를 임베딩하고 자연어 질의응답이 동작하는 데모 서비스를 완성한다.
+
+---
+
+### 9. RAG 데모 — LangChain4j + Qdrant + Ollama
+
+#### RAG란?
+
+```
+순수 LLM: 학습 데이터만으로 답변 → 도메인 특화 지식 부족
+RAG:      외부 문서 검색 → LLM에 컨텍스트 전달 → 정확한 답변
+```
+
+#### RAG 파이프라인
+
+```
+[문서 저장 단계 - Ingest]
+FDS 문서 (.txt)
+    → 청크 분할 (500자 단위)
+    → nomic-embed-text 임베딩 (768차원 벡터)
+    → Qdrant 벡터 DB 저장
+
+[질의응답 단계 - Query]
+사용자 질문
+    → nomic-embed-text 임베딩
+    → Qdrant 유사도 검색 (Cosine, 상위 3개)
+    → 검색된 문서 + 질문을 qwen2.5에 전달
+    → 자연어 답변 생성
+```
+
+#### 프로젝트 구조
+
+```
+phase2/rag-demo/
+├── pom.xml
+└── src/main/
+    ├── java/com/example/ragdemo/
+    │   ├── RagDemoApplication.java
+    │   ├── config/
+    │   │   └── LangChainConfig.java      # LangChain4j + Qdrant 빈 설정
+    │   ├── controller/
+    │   │   └── RagController.java        # REST API 엔드포인트
+    │   └── service/
+    │       └── RagService.java           # RAG 핵심 로직
+    └── resources/
+        ├── application.yml               # 포트 8085
+        └── docs/
+            ├── fds-overview.txt          # FDS 개요 문서
+            ├── fds-rules.txt             # FDS 탐지 규칙 문서
+            └── fds-ml-model.txt          # FDS ML 모델 설계 문서
+```
+
+#### 기술 스택
+
+| 항목 | 버전 / 내용 |
+|------|------------|
+| LangChain4j | 1.0.0-beta1 |
+| Qdrant | v1.13.0 (Docker) |
+| 임베딩 모델 | nomic-embed-text (768차원, Ollama) |
+| 채팅 모델 | qwen2.5 (Ollama) |
+| 포트 | 8085 |
+
+#### Qdrant 실행 방법
+
+```bash
+# Qdrant 컨테이너 실행 (v1.13.0 고정 — LangChain4j gRPC 클라이언트 호환 버전)
+docker run -d \
+  --name qdrant \
+  -p 6333:6333 \
+  -p 6334:6334 \
+  qdrant/qdrant:v1.13.0
+
+# 컬렉션 생성 (최초 1회)
+curl -X PUT http://localhost:6333/collections/fds-documents \
+  -H "Content-Type: application/json" \
+  -d '{"vectors": {"size": 768, "distance": "Cosine"}}'
+```
+
+> **주의:** LangChain4j 내부 Qdrant gRPC 클라이언트(1.13.0)와 서버 버전이 일치해야 한다.
+> Qdrant 최신 버전(1.17.x)과 호환 불일치로 인해 벡터 조회 버그가 발생한다.
+
+#### API 엔드포인트
+
+```
+# 문서 임베딩 (최초 1회 또는 문서 변경 시)
+POST http://localhost:8085/rag/ingest
+
+# 자연어 질의응답
+POST http://localhost:8085/rag/query
+Content-Type: application/json
+
+{"question": "질문 내용", "maxResults": 3}
+```
+
+#### 호출 예시
+
+```bash
+# 1. 문서 임베딩
+curl -X POST http://localhost:8085/rag/ingest
+# → {"status":"success","fileCount":3,"totalChunks":7}
+
+# 2. 질의응답
+curl -X POST http://localhost:8085/rag/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "FDS 머신러닝 모델 종류가 뭐야?", "maxResults": 3}'
+# → {"answer":"FDS 머신러닝 모델에는 다음과 같은 종류가 있습니다:\n1. 이상치 탐지 모델...","sources":[...]}
+```
+
+**학습 포인트:**
+- 문서를 청크로 분할할수록 검색 정확도가 높아진다 (청크 크기는 도메인에 따라 튜닝 필요)
+- 유사도 임계값(0.7)으로 관련 없는 문서가 답변에 섞이는 것을 방지한다
+- `sources` 필드로 답변의 근거 문서를 추적할 수 있다 (금융권 감사 대응에 유리)
+- Qdrant는 REST(6333)와 gRPC(6334) 포트를 모두 열어야 LangChain4j와 정상 동작한다
+
+---
+
+## 포트 현황
+
+| 포트 | 서비스 | 비고 |
+|------|--------|------|
+| 8080 | code-server | 브라우저 VS Code |
+| 8081 | user-service | Spring Cloud 실습 |
+| 8082 | product-service | Spring Cloud 실습 |
+| 8084 | gateway | Spring Cloud Gateway |
+| 8085 | rag-demo | Phase 2 RAG 데모 |
+| 8761 | eureka-server | 서비스 디스커버리 대시보드 |
+| 8888 | config-server | 중앙 설정 관리 |
+| 6333 | Qdrant REST | 벡터 DB REST API |
+| 6334 | Qdrant gRPC | 벡터 DB gRPC (LangChain4j 사용) |
+| 11434 | Ollama | LLM 런타임 |
+
+---
+
 ## English Learning Log
 
 ### 2026-03-09
@@ -404,12 +544,14 @@ curl http://localhost:8084/products/1/detail
 
 ```
 ai-learning-2026/
-└── phase1/
-    ├── spring-ollama/            # Spring Boot + Ollama 연동 (Docker Compose 포함)
-    └── spring-cloud-demo/        # Spring Cloud MSA 전체 실습 (Maven 멀티모듈)
-        ├── eureka-server/        #   ├── 서비스 디스커버리 (포트 8761)
-        ├── config-server/        #   ├── 중앙 설정 관리 (포트 8888)
-        ├── gateway/              #   ├── API 게이트웨이 (포트 8084)
-        ├── user-service/         #   ├── 사용자 서비스 (포트 8081)
-        └── product-service/      #   └── 상품 서비스 (포트 8082)
+├── phase1/
+│   ├── spring-ollama/            # Spring Boot + Ollama 연동 (Docker Compose 포함)
+│   └── spring-cloud-demo/        # Spring Cloud MSA 전체 실습 (Maven 멀티모듈)
+│       ├── eureka-server/        #   ├── 서비스 디스커버리 (포트 8761)
+│       ├── config-server/        #   ├── 중앙 설정 관리 (포트 8888)
+│       ├── gateway/              #   ├── API 게이트웨이 (포트 8084)
+│       ├── user-service/         #   ├── 사용자 서비스 (포트 8081)
+│       └── product-service/      #   └── 상품 서비스 (포트 8082)
+└── phase2/
+    └── rag-demo/                 # RAG 데모 — LangChain4j + Qdrant + Ollama (포트 8085)
 ```
