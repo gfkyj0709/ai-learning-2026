@@ -555,3 +555,26 @@ ai-learning-2026/
 └── phase2/
     └── rag-demo/                 # RAG 데모 — LangChain4j + Qdrant + Ollama (포트 8085)
 ```
+
+## 유지보수 스크립트
+
+### cleanup-codeserver.sh — 비활성 code-server 프로세스 자동 종료
+
+**경로:** `scripts/cleanup-codeserver.sh`
+
+24시간 이상 비활성 상태인 code-server extensionHost 프로세스를 자동으로 종료한다.
+code-server 브라우저 탭을 닫지 않고 방치하면 탭당 ~200MB씩 메모리를 점유하는 문제를 방지한다.
+
+#### crontab 등록 (최초 1회)
+```bash
+crontab -e
+```
+아래 내용 추가:
+```
+0 * * * * /home/younggenius/scripts/cleanup-codeserver.sh >> /home/younggenius/scripts/cleanup.log 2>&1
+```
+
+#### 로그 확인
+```bash
+cat ~/scripts/cleanup.log
+```
