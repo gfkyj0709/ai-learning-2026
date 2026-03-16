@@ -4,7 +4,7 @@ FDS 문서 기반 RAG(Retrieval-Augmented Generation) 데모
 
 ## 기술 스택
 - Spring Boot 3.4.3
-- LangChain4j 1.0.0-beta1
+- LangChain4j 1.0.0
 - Ollama (qwen2.5 - 채팅, nomic-embed-text - 임베딩)
 - Qdrant v1.13.0 (벡터 저장소)
 
@@ -50,7 +50,7 @@ curl -X PUT http://localhost:6333/collections/fds-documents \
 > 이 경우 검색 결과의 벡터값이 빈 배열(0차원)로 반환되어
 > `Length of vector a (0) must be equal to the length of vector b (768)` 에러가 발생한다.
 > LangChain4j 최신 버전(1.0.0-beta1)에서도 동일한 문제가 확인되었다.
-
+> LangChain4j 최신 버전(1.0.0)으로 변경
 ### 2. Ollama 모델 설치
 
 ```bash

@@ -1,7 +1,7 @@
 package com.example.ragdemo.config;
 
 import dev.langchain4j.data.segment.TextSegment;
-import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.ollama.OllamaChatModel;
 import dev.langchain4j.model.ollama.OllamaEmbeddingModel;
@@ -38,7 +38,7 @@ public class LangChainConfig {
     private String collectionName;
 
     @Bean
-    public ChatLanguageModel chatLanguageModel() {
+    public ChatModel chatLanguageModel() {
         return OllamaChatModel.builder()
                 .baseUrl(ollamaBaseUrl)
                 .modelName(chatModelName)
