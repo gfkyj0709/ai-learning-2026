@@ -513,6 +513,159 @@ curl -X POST http://localhost:8085/rag/query \
 
 ---
 
+### 10. LLM 심화 — Transformer / Attention / Embedding / Prompt Engineering
+
+**학습일:** 2026-03-16
+
+#### 학습 목표
+
+LLM이 텍스트를 처리하는 내부 원리를 이해하고, 이를 기반으로 효과적인 프롬프트 작성과 RAG/Agent 설계에 활용한다.
+
+#### 10-1. RNN의 한계와 Transformer 등장
+
+| 구분 | RNN | Transformer |
+|---|---|---|
+| 처리 방식 | 순서대로 (for 루프) | 전체 동시 (행렬 연산) |
+| 장기 의존성 | 앞 내용 잊어버림 | 모든 단어가 모든 단어 참조 |
+| GPU 활용 | 병렬화 어려움 | 병렬화 최적화 |
+| 긴 문장 | 성능 저하 | 성능 유지 |
+
+> 2017년 Google 논문 **"Attention Is All You Need"** — RNN을 완전히 제거하고 Attention만으로 전체 병렬 처리 구현
+
+```java
+// RNN 방식 — 순차 처리 (느림)
+for (String word : sentence) {
+    process(word); // 앞 결과 나와야 다음 처리 가능
+}
+
+// Transformer 방식 — 병렬 처리 (빠름)
+sentence.parallelStream()
+        .map(word -> attention(word, allWords))
+        .collect(...);
+```
+
+#### 10-2. Attention
+
+**한 줄 정의:** 현재 단어를 이해하기 위해 문장 전체를 조회해서 맥락을 흡수하는 함수
+
+```
+Q (Query)  = 내가 찾고 싶은 것 — 현재 처리 중인 단어
+K (Key)    = 각 단어의 검색 키 — 모든 단어의 식별자
+V (Value)  = 실제 꺼내올 정보 — 각 단어가 가진 내용
+
+Attention(Q, K, V) = softmax(QKᵀ / √d) · V
+```
+
+| 수식 요소 | 의미 |
+|---|---|
+| `QKᵀ` | Query와 모든 Key의 유사도 계산 (내적) |
+| `/ √d` | 값 폭발 방지 스케일 조정 |
+| `softmax` | 유사도를 0~1 확률로 변환 (합계 = 1) |
+| `· V` | 확률 가중치로 Value 합산 → 최종 맥락 벡터 |
+
+```
+Before: "해외" = [0.8, 0.7]       ← 단어 자체 의미만
+After:  "해외" = [0.763, 0.611]   ← 거래·시간대 맥락까지 반영
+```
+
+**Qdrant 연결:** Qdrant의 벡터 유사도 검색이 QKᵀ 내적 연산과 동일한 구조
+
+#### 10-3. Multi-Head Attention
+
+**한 줄 정의:** Attention을 여러 개 병렬로 돌려서 다양한 관점을 동시에 포착하는 구조
+
+| 비교 항목 | Attention | Multi-Head Attention |
+|---|---|---|
+| 관점 수 | 1개 | 8~96개 |
+| 포착 패턴 | 단일 관계 | 복합 조합 관계 |
+| 역할 분담 | 없음 | 학습으로 자동 생성 |
+
+FDS 예시:
+```
+Head 1 → 금액 관점 분석
+Head 2 → 위치 관점 분석
+Head 3 → 시간 관점 분석
+Head 4 → 기기 관점 분석
+         ↓
+Concat + Linear → 종합 판단
+```
+
+> **핵심:** Head 역할 분담은 사람이 지정하는 게 아니라 데이터가 학습 과정에서 자동으로 만들어냄
+
+#### 10-4. Embedding
+
+**한 줄 정의:** 텍스트를 LLM이 처리할 수 있는 숫자 벡터로 변환하는 전처리 게이트웨이
+
+```
+의미가 비슷한 단어 = 벡터 거리 가까움
+"해외" ↔ "국외" ↔ "외국"  → 가까움
+"해외" ↔ "사과"            → 멀음
+
+왕 - 남자 + 여자 = 여왕  (벡터 연산으로 의미 관계 표현)
+```
+
+새 단어/개념 학습 방법:
+
+| 방법 | 비용 | 새 정보 반영 |
+|---|---|---|
+| Pre-training | 수백억 | 완전 내재화 |
+| Fine-tuning | 수십만~억 | 도메인 특화 |
+| RAG | 거의 0 | 실시간 반영 |
+
+> **RAG = 오픈북 시험** — Qdrant에서 관련 문서 꺼내 보면서 답변 작성. 모델 가중치(벡터) 자체는 변하지 않음
+
+#### 10-5. Prompt Engineering
+
+**핵심 원리:** LLM은 확률 예측 기계 → 프롬프트는 확률 분포를 원하는 방향으로 조작하는 도구
+
+```
+프롬프트가 구체적일수록 → 확률 분포가 원하는 방향으로 집중
+프롬프트가 모호할수록   → 확률이 사방으로 퍼짐
+```
+
+핵심 기법 4가지:
+
+```
+1. Role (역할 부여)
+   "너는 10년 경력의 금융 보안 전문가야."
+   → 해당 역할 벡터 공간 활성화 → 전문적 어휘 확률 상승
+
+2. Few-shot (예시 제공)
+   예시 1) 새벽 3시, 해외, 500만원 → 고위험
+   예시 2) 오후 2시, 국내, 3만원   → 정상
+   → 모델이 예시를 Attention으로 참조해 출력 패턴 맞춤
+
+3. Chain of Thought (단계적 사고)
+   "1단계: 시간대 분석 / 2단계: 위치 분석 / ..."
+   → 중간 추론이 다음 토큰의 컨텍스트가 됨 → 답변 품질 향상
+
+4. Output Format (출력 형식 지정)
+   {"risk_level": "HIGH", "reasons": [], "score": 0}
+   → Spring에서 LLM 응답 파싱 시 필수
+```
+
+#### 오늘 떠올린 아이디어 — 하이브리드 FDS 구조
+
+```
+소액 거래 (10만원 이하)  →  룰 기반 FDS (비용 0, 빠름)
+고액 거래 (100만원 이상) →  룰 기반 1차 필터
+                          +  Multi-Head Attention 2차 정밀 분석
+                             (금액·위치·시간·기기 패턴 동시 탐지)
+
+룰 기반: 사람이 정의한 명시적 패턴
+AI 기반: 데이터가 스스로 발견한 복합 패턴 (Impossible Travel 등)
+```
+
+→ 상세 내용: [`docs/2026-03-16-llm-core-concepts.md`](docs/2026-03-16-llm-core-concepts.md)
+
+#### 다음 학습 예정
+
+- [ ] AI Agent 동작 원리 (LLM이 스스로 판단해서 도구를 쓰는 구조)
+- [ ] LangChain4j Agent / Tool / Memory 구현
+- [ ] Prompt Engineering 심화 실습 (Ollama)
+
+---
+
 ## 포트 현황
 
 | 포트 | 서비스 | 비고 |
@@ -552,8 +705,10 @@ ai-learning-2026/
 │       ├── gateway/              #   ├── API 게이트웨이 (포트 8084)
 │       ├── user-service/         #   ├── 사용자 서비스 (포트 8081)
 │       └── product-service/      #   └── 상품 서비스 (포트 8082)
-└── phase2/
-    └── rag-demo/                 # RAG 데모 — LangChain4j + Qdrant + Ollama (포트 8085)
+├── phase2/
+│   └── rag-demo/                 # RAG 데모 — LangChain4j + Qdrant + Ollama (포트 8085)
+└── docs/
+    └── 2026-03-16-llm-core-concepts.md  # LLM 심화 개념 정리
 ```
 
 ## 유지보수 스크립트
