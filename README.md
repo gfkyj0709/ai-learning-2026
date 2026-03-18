@@ -733,3 +733,51 @@ crontab -e
 ```bash
 cat ~/scripts/cleanup.log
 ```
+
+### 11. AI Agent / LangChain4j / Fine-tuning 개념 정리
+
+**학습일:** 2026-03-18
+
+#### 개념 정리
+
+| 개념 | 한 줄 요약 |
+|------|-----------|
+| **RAG vs Agent** | RAG = 1번 검색 고정 흐름 / Agent = N번 반복 자율 판단 |
+| **RAG 정의** | 벡터DB 전용이 아닌 외부 정보 주입 패턴 전체 (키워드/API/웹 포함) |
+| **RAG 지식 저장** | 저장 안 됨 — 오픈북 시험, 매번 Qdrant 조회 |
+| **ReAct 패턴** | Reasoning → Acting → Observing 반복, Final Answer 감지 시 종료 |
+| **LangChain4j** | LLM 앱 개발 공통 기능 라이브러리 (Java용 LangChain) |
+| **Function Calling** | LLM이 함수 호출 JSON 출력 → @Tool이 이걸 추상화한 것 |
+| **Memory** | Short-term(세션 내) / Long-term(DB 영구 저장) |
+| **Pre-training** | 처음부터 대규모 학습 → 수천억 원, 불가능 |
+| **RLHF** | 인간 피드백으로 대화 품질 향상 → ChatGPT/Claude가 잘 대화하는 이유 |
+| **Fine-tuning** | 기존 모델 도메인 특화 미세 조정 → Phase 4에서 실습 |
+| **LoRA** | 전체의 1% 파라미터만 업데이트 → T4 무료 GPU로 가능 |
+
+#### FDS AI Assistant 조립 구조
+
+```java
+// Agent + RAG 동시 사용 — 최종 목표 구조
+AiServices.builder(FdsAgent.class)
+    .chatLanguageModel(ollamaModel)   // qwen2.5
+    .tools(fdsTool)                   // DB 조회 Tool
+    .contentRetriever(qdrantRetriever) // FDS 문서 RAG
+    .chatMemory(memory)               // 대화 기억
+    .build();
+```
+
+#### Google Colab 무료 GPU
+
+```
+GPU: NVIDIA T4 (16GB VRAM)
+세션: 최대 12시간
+비용: 0원
+LoRA Fine-tuning: 충분히 가능 (4~6GB VRAM 사용)
+```
+
+→ 상세 내용: [`phase2/docs/2026-03-18-agent-langchain4j.md`](phase2/docs/2026-03-18-agent-langchain4j.md)
+
+#### 다음 세션 예정
+
+- [ ] LangGraph (상태 그래프)
+- [ ] Agent 실습 (rag-demo에 /agent/chat 추가)
