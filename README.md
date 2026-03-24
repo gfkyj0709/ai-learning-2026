@@ -777,7 +777,167 @@ LoRA Fine-tuning: 충분히 가능 (4~6GB VRAM 사용)
 
 → 상세 내용: [`phase2/docs/2026-03-18-agent-langchain4j.md`](phase2/docs/2026-03-18-agent-langchain4j.md)
 
+### 12. FDS Agent 실습 — LangChain4j Tool + Memory + ReAct 루프
+
+**학습일:** 2026-03-24
+
+#### 구현 내용
+
+| 파일 | 역할 |
+|------|------|
+| `FdsAgent.java` | LangChain4j AiServices용 인터페이스 선언 |
+| `FdsTool.java` | @Tool 2개 (통계조회, 전월비교) Mock 데이터 |
+| `AgentController.java` | POST /agent/chat 엔드포인트 |
+| `LangChainConfig.java` | Agent 빈 조립 (Model + Tool + Memory) |
+
+#### ReAct 루프 로그로 직접 확인
+
+```
+1번째 LLM 호출 (Reasoning)
+  → tools 목록 전달: [getFdsStats, compareFdsStats]
+  → LLM 응답: tool_calls: [{"name": "getFdsStats", "arguments": {"yearMonth": "202503"}}]
+
+Java 코드가 getFdsStats("202503") 실행
+  → Mock 데이터 반환 (3,821건 등)
+
+2번째 LLM 호출 (최종 답변)
+  → messages에 role: "tool" 로 결과 주입
+  → LLM이 자연어로 정리 → 최종 답변
+```
+
+#### 로그 설정 (dev 프로파일)
+
+```yaml
+# application.yml — dev 프로파일에서만 로그 활성화
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+langchain4j:
+  ollama:
+    chat-model:
+      log-requests: true
+      log-responses: true
+```
+
+```bash
+# dev 프로파일로 실행
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+#### 테스트
+
+```bash
+# Tool 단순 조회
+curl -X POST http://localhost:8085/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "202503 통계 알려줘"}'
+
+# Memory 확인 (이전 대화 맥락 유지)
+curl -X POST http://localhost:8085/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "방금 조회한 달의 전월 대비 비교해줘"}'
+```
+
+---
+
+### 13. RAG + Agent 연동 — ContentRetriever 추가
+
+**학습일:** 2026-03-24
+
+#### 변경 내용
+
+`LangChainConfig.java`의 `fdsAgent()` 빈에 `ContentRetriever` 추가.
+
+```java
+// Agent + RAG 동시 동작 — 최종 목표 구조
+return AiServices.builder(FdsAgent.class)
+        .chatModel(agentChatModel)
+        .chatMemory(MessageWindowChatMemory.withMaxMessages(10))
+        .tools(fdsTool)                      // DB 조회 Tool
+        .contentRetriever(contentRetriever)  // ← RAG 추가
+        .build();
+```
+
+#### 동작 확인
+
+```bash
+# FDS 문서 내용(RAG) + 통계 데이터(Tool) 동시 활용
+curl -X POST http://localhost:8085/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "FDS 머신러닝 모델 종류 설명하고 이번달 ML 탐지 건수도 알려줘"}'
+
+# 응답: Isolation Forest, XGBoost 등 문서 내용 + ML 탐지 1,716건 통계 동시 답변
+```
+
+---
+
+### 14. Spring Cloud Gateway — api-gateway (포트 8084)
+
+**학습일:** 2026-03-24
+
+#### 프로젝트 구조
+
+```
+phase2/api-gateway/
+├── pom.xml
+└── src/main/
+    ├── java/com/example/apigateway/
+    │   └── ApiGatewayApplication.java
+    └── resources/
+        └── application.yml
+```
+
+#### 라우팅 설정
+
+```yaml
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: rag-service
+          uri: http://localhost:8085
+          predicates:
+            - Path=/rag/**
+
+        - id: agent-service
+          uri: http://localhost:8085
+          predicates:
+            - Path=/agent/**
+```
+
+#### 동작 구조
+
+```
+클라이언트
+    ↓
+8084 (api-gateway)  ← 단일 진입점
+    ├── /rag/**    → 8085/rag/**
+    └── /agent/**  → 8085/agent/**
+```
+
+#### 테스트
+
+```bash
+# Gateway 통해서 Agent 호출
+curl -X POST http://localhost:8084/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "202503 통계 알려줘"}'
+# → Gateway(8084) → rag-demo(8085) → 정상 응답
+```
+
+#### 학습 포인트
+
+- `StripPrefix=0` — 경로 그대로 전달 (컨트롤러 경로와 일치시켜야 함)
+- `StripPrefix=1` — 첫 번째 경로 세그먼트 제거 (`/agent/chat` → `/chat`)
+- Spring Cloud Gateway는 WebFlux 기반 리액티브 — `spring-boot-starter-web` 미포함
+- `/actuator/gateway/routes` 로 활성 라우팅 목록 확인 가능
+
 #### 다음 세션 예정
 
-- [ ] LangGraph (상태 그래프)
-- [ ] Agent 실습 (rag-demo에 /agent/chat 추가)
+- [ ] Spring Cloud Eureka — rag-demo 서비스 등록
+- [ ] Spring Cloud Config Server — 중앙 설정 관리
+- [ ] LangGraph 실습 (Python) — FDS 워크플로우 상태 그래프
+- [ ] FdsTool 실제 DB 연결 (PostgreSQL)
