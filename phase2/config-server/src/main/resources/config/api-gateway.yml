@@ -1,0 +1,99 @@
+# ============================================================
+# api-gateway 서비스 중앙 설정 파일 (Config Server native)
+# api-gateway service centralized configuration (Config Server native)
+#
+# 이 파일은 Config Server의 classpath:/config 디렉토리에 위치하며,
+# api-gateway 클라이언트가 Config Server(8888)에 연결하면 자동으로 제공됩니다.
+#
+# This file is located in the Config Server's classpath:/config directory.
+# It is automatically served to the api-gateway client when it connects to Config Server (8888).
+#
+# 접근 URL / Access URL: GET http://localhost:8888/api-gateway/default
+# ============================================================
+
+server:
+  # api-gateway 서비스 포트 / api-gateway service port
+  port: 8084
+
+spring:
+  application:
+    # Eureka 등록 및 Config Server 요청 시 사용되는 애플리케이션 이름
+    # Application name used for Eureka registration and Config Server requests
+    name: api-gateway
+
+  cloud:
+    gateway:
+      routes:
+        # ─────────────────────────────────────────────────────────────────
+        # Route 1: RAG 엔드포인트 프록시 / Proxy for RAG endpoints
+        #   - 요청 경로 : /rag/**
+        #   - 백엔드   : lb://rag-demo (Eureka 레지스트리에서 rag-demo 인스턴스를 동적으로 탐색)
+        #   - lb:// 스킴은 Spring Cloud LoadBalancer가 처리 — 고정 IP 대신 서비스 이름 사용
+        #   - lb:// scheme is handled by Spring Cloud LoadBalancer — uses service name, not fixed IP
+        #   - StripPrefix=0 → 경로를 그대로 백엔드로 전달 (접두사 제거 없음)
+        #     (e.g. GET /rag/query  →  GET rag-demo-instance/rag/query)
+        # ─────────────────────────────────────────────────────────────────
+        - id: rag-service
+          # lb:// — Eureka에서 'rag-demo' 서비스 인스턴스를 조회하여 로드밸런싱
+          # lb:// — resolves 'rag-demo' service instances from Eureka with load balancing
+          uri: lb://rag-demo
+          predicates:
+            # /rag/ 로 시작하는 모든 요청 매칭 / Match all requests starting with /rag/
+            - Path=/rag/**
+          filters:
+            # 경로를 그대로 유지 (접두사 제거 없음) / Keep path as-is (no prefix stripping)
+            - StripPrefix=0
+
+        # ─────────────────────────────────────────────────────────────────
+        # Route 2: Agent 엔드포인트 프록시 / Proxy for Agent endpoints
+        #   - 요청 경로 : /agent/**
+        #   - 백엔드   : lb://rag-demo (Eureka 레지스트리에서 rag-demo 인스턴스를 동적으로 탐색)
+        #   - lb:// 스킴은 Spring Cloud LoadBalancer가 처리 — 고정 IP 대신 서비스 이름 사용
+        #   - lb:// scheme is handled by Spring Cloud LoadBalancer — uses service name, not fixed IP
+        #   - StripPrefix=0 → 경로를 그대로 백엔드로 전달 (접두사 제거 없음)
+        #     (e.g. POST /agent/chat  →  POST rag-demo-instance/agent/chat)
+        # ─────────────────────────────────────────────────────────────────
+        - id: agent-service
+          # lb:// — Eureka에서 'rag-demo' 서비스 인스턴스를 조회하여 로드밸런싱
+          # lb:// — resolves 'rag-demo' service instances from Eureka with load balancing
+          uri: lb://rag-demo
+          predicates:
+            # /agent/ 로 시작하는 모든 요청 매칭 / Match all requests starting with /agent/
+            - Path=/agent/**
+          filters:
+            # 경로를 그대로 유지 (접두사 제거 없음) / Keep path as-is (no prefix stripping)
+            - StripPrefix=0
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Eureka 클라이언트 설정 / Eureka client configuration
+#   api-gateway를 eureka-server(8761)에 등록하고
+#   lb:// 라우팅에 필요한 서비스 레지스트리 정보를 수신합니다.
+#   Registers api-gateway with eureka-server (8761) and receives
+#   service registry data required for lb:// route resolution.
+# ──────────────────────────────────────────────────────────────────────────────
+eureka:
+  instance:
+    # 호스트명 대신 IP 주소로 Eureka에 등록 (컨테이너/멀티-호스트 환경 호환)
+    # Register with IP address instead of hostname (compatible with container/multi-host env)
+    prefer-ip-address: true
+  client:
+    service-url:
+      # Eureka 서버 주소 — eureka-server 프로젝트의 기본 포트(8761)
+      # Eureka server address — default port (8761) of the eureka-server project
+      defaultZone: http://localhost:8761/eureka/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # health, info, gateway 라우팅 정보 노출 / Expose health, info, and gateway route info
+        include: health,info,gateway
+  endpoint:
+    gateway:
+      # /actuator/gateway/routes 엔드포인트 활성화 / Enable /actuator/gateway/routes endpoint
+      enabled: true
+
+logging:
+  level:
+    # 게이트웨이 라우팅 디버그 로그 / Gateway routing debug logs
+    org.springframework.cloud.gateway: DEBUG

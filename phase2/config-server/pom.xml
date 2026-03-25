@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <!-- phase2 프로젝트 전체와 동일한 Spring Boot 버전 사용 / Same Spring Boot version as other phase2 projects -->
+        <version>3.4.3</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>config-server</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>config-server</name>
+    <description>Spring Cloud Config Server — centralized configuration server for phase2 services</description>
+
+    <properties>
+        <java.version>21</java.version>
+        <!--
+            Spring Cloud 2024.0.x (Leyton) — Spring Boot 3.4.x 호환 버전.
+            phase2 전체 프로젝트와 동일한 Spring Cloud 버전을 사용합니다.
+            Spring Cloud 2024.0.x (Leyton) is compatible with Spring Boot 3.4.x.
+            Uses the same Spring Cloud version as all phase2 projects.
+        -->
+        <spring-cloud.version>2024.0.1</spring-cloud.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!--
+                Spring Cloud BOM — 모든 spring-cloud-* 의존성 버전을 중앙에서 관리합니다.
+                Spring Cloud BOM — manages all spring-cloud-* dependency versions centrally.
+            -->
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!--
+            Spring Cloud Config Server — 클라이언트 애플리케이션에 외부화된 설정을 제공하는 서버.
+            native 또는 git 프로파일로 설정 파일을 제공합니다.
+            Spring Cloud Config Server — serves externalized configuration to client applications.
+            Supports native (local filesystem) or git profile for serving config files.
+        -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-config-server</artifactId>
+        </dependency>
+
+        <!--
+            Actuator — /actuator/health, /actuator/env 등 운영 엔드포인트 제공.
+            Actuator — exposes operational endpoints such as /actuator/health and /actuator/env.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!--
+            Netflix Eureka Client — config-server를 Eureka 레지스트리(8761)에 등록합니다.
+            클라이언트들이 서비스 이름(config-server)으로 Config Server를 탐색할 수 있게 합니다.
+            Netflix Eureka Client — registers config-server with the Eureka registry (8761).
+            Allows clients to discover Config Server by service name (config-server).
+        -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

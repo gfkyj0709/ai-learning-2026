@@ -1,0 +1,75 @@
+# ============================================================
+# rag-demo 서비스 중앙 설정 파일 (Config Server native)
+# rag-demo service centralized configuration (Config Server native)
+#
+# 이 파일은 Config Server의 classpath:/config 디렉토리에 위치하며,
+# rag-demo 클라이언트가 Config Server(8888)에 연결하면 자동으로 제공됩니다.
+#
+# This file is located in the Config Server's classpath:/config directory.
+# It is automatically served to the rag-demo client when it connects to Config Server (8888).
+#
+# 접근 URL / Access URL: GET http://localhost:8888/rag-demo/default
+# ============================================================
+
+server:
+  # rag-demo 서비스 포트 / rag-demo service port
+  port: 8085
+
+spring:
+  application:
+    # Eureka 등록 및 Config Server 요청 시 사용되는 애플리케이션 이름
+    # Application name used for Eureka registration and Config Server requests
+    name: rag-demo
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Ollama 설정 / Ollama configuration
+#   로컬에서 실행 중인 Ollama LLM 서버와의 연결 설정입니다.
+#   Connection settings for the locally running Ollama LLM server.
+# ──────────────────────────────────────────────────────────────────────────────
+langchain4j:
+  ollama:
+    chat-model:
+      # Ollama 서버 기본 URL / Ollama server base URL
+      base-url: http://localhost:11434
+      # 채팅에 사용할 LLM 모델 이름 / LLM model name used for chat
+      model-name: qwen2.5
+      # 생성 다양성 조정 (0.0=결정론적, 1.0=창의적) / Controls generation diversity (0.0=deterministic, 1.0=creative)
+      temperature: 0.7
+      # 채팅 요청 타임아웃 / Chat request timeout
+      timeout: 120s
+    embedding-model:
+      # Ollama 서버 기본 URL / Ollama server base URL
+      base-url: http://localhost:11434
+      # 텍스트 임베딩에 사용할 모델 이름 / Model name used for text embedding
+      model-name: nomic-embed-text
+      # 임베딩 요청 타임아웃 / Embedding request timeout
+      timeout: 60s
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Qdrant 벡터 데이터베이스 설정 / Qdrant vector database configuration
+#   RAG 파이프라인에서 문서 임베딩 저장 및 유사도 검색에 사용됩니다.
+#   Used for storing document embeddings and similarity search in the RAG pipeline.
+# ──────────────────────────────────────────────────────────────────────────────
+qdrant:
+  # Qdrant 서버 호스트 / Qdrant server host
+  host: localhost
+  # Qdrant gRPC 포트 (기본값 6334) / Qdrant gRPC port (default 6334)
+  port: 6334
+  # 문서 임베딩이 저장되는 컬렉션 이름 / Collection name where document embeddings are stored
+  collection-name: fds-documents
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Eureka 클라이언트 설정 / Eureka client configuration
+# ──────────────────────────────────────────────────────────────────────────────
+eureka:
+  instance:
+    # 호스트명 대신 IP 주소로 Eureka에 등록 / Register with IP address instead of hostname
+    prefer-ip-address: true
+  client:
+    service-url:
+      # Eureka 서버 주소 / Eureka server address
+      defaultZone: http://localhost:8761/eureka/
+
+logging:
+  level:
+    root: INFO
