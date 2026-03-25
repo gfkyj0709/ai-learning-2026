@@ -1,4 +1,4 @@
-# application.yml (기본 - 운영용, 로그 없음)
+# application.yml (기본 - 운영용)
 server:
   port: 8085
 
@@ -8,6 +8,19 @@ spring:
   cloud:
     discovery:
       enabled: true
+  datasource:
+    url: jdbc:postgresql://localhost:5432/fdsdb
+    username: fds
+    password: fds1234
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        show_sql: false
+        format_sql: true
 
 langchain4j:
   ollama:
@@ -26,7 +39,6 @@ qdrant:
   port: 6334
   collection-name: fds-documents
 
-# Eureka 클라이언트 설정 / Eureka client configuration
 eureka:
   instance:
     prefer-ip-address: true
@@ -39,11 +51,15 @@ logging:
     root: INFO
 
 ---
-# application-dev.yml (개발용, 로그 풍부)
+# dev 프로파일
 spring:
   config:
     activate:
       on-profile: dev
+  jpa:
+    properties:
+      hibernate:
+        show_sql: true
 
 langchain4j:
   ollama:
@@ -55,3 +71,4 @@ logging:
   level:
     com.example.ragdemo: DEBUG
     dev.langchain4j: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE

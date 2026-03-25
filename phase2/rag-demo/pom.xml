@@ -92,6 +92,25 @@
             <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
         </dependency>
 
+        <!--
+            Spring Data JPA — JPA 기반 리포지토리 추상화 및 ORM 통합.
+            Spring Data JPA — JPA-based repository abstraction and ORM integration.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+
+        <!--
+            PostgreSQL JDBC 드라이버 — fdsdb 데이터베이스 연결에 사용됩니다.
+            PostgreSQL JDBC Driver — used to connect to the fdsdb database.
+        -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
