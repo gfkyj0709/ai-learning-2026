@@ -20,10 +20,28 @@
     <properties>
         <java.version>21</java.version>
         <langchain4j.version>1.0.0</langchain4j.version>
+        <!--
+            Spring Cloud 2024.0.x (Leyton) — Spring Boot 3.4.x 호환 버전.
+            api-gateway, eureka-server와 동일한 버전을 사용합니다.
+            Spring Cloud 2024.0.x (Leyton) is compatible with Spring Boot 3.4.x.
+            Aligned with the same version used by api-gateway and eureka-server.
+        -->
+        <spring-cloud.version>2024.0.1</spring-cloud.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <!--
+                Spring Cloud BOM — 모든 spring-cloud-* 의존성 버전을 중앙에서 관리합니다.
+                Spring Cloud BOM — manages all spring-cloud-* dependency versions centrally.
+            -->
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <dependency>
                 <groupId>dev.langchain4j</groupId>
                 <artifactId>langchain4j-bom</artifactId>
@@ -63,6 +81,15 @@
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-qdrant</artifactId>
+        </dependency>
+
+        <!--
+            Netflix Eureka Client — 이 서비스를 Eureka 레지스트리(8761)에 자동 등록합니다.
+            Netflix Eureka Client — auto-registers this service with the Eureka registry (8761).
+        -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
         </dependency>
 
         <!-- Lombok -->

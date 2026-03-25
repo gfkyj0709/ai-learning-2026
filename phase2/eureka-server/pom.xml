@@ -7,22 +7,24 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <!-- rag-demo와 동일한 Spring Boot 버전 사용 / Same Spring Boot version as rag-demo -->
+        <!-- phase2 프로젝트 전체와 동일한 Spring Boot 버전 사용 / Same Spring Boot version as other phase2 projects -->
         <version>3.4.3</version>
         <relativePath/>
     </parent>
 
     <groupId>com.example</groupId>
-    <artifactId>api-gateway</artifactId>
+    <artifactId>eureka-server</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>api-gateway</name>
-    <description>Spring Cloud Gateway — routes /rag/** and /agent/** to rag-demo (8085)</description>
+    <name>eureka-server</name>
+    <description>Netflix Eureka Service Registry — central discovery server for phase2 services</description>
 
     <properties>
         <java.version>21</java.version>
         <!--
+            Spring Cloud 2024.0.x (Leyton) — Spring Boot 3.4.x 호환 버전.
+            api-gateway와 동일한 Spring Cloud 버전을 사용합니다.
             Spring Cloud 2024.0.x (Leyton) is compatible with Spring Boot 3.4.x.
-            Spring Boot 3.4.x 와 호환되는 Spring Cloud 2024.0.x (Leyton) 를 사용합니다.
+            Uses the same Spring Cloud version as api-gateway.
         -->
         <spring-cloud.version>2024.0.1</spring-cloud.version>
     </properties>
@@ -30,8 +32,8 @@
     <dependencyManagement>
         <dependencies>
             <!--
-                Spring Cloud BOM — manages all spring-cloud-* dependency versions centrally.
                 Spring Cloud BOM — 모든 spring-cloud-* 의존성 버전을 중앙에서 관리합니다.
+                Spring Cloud BOM — manages all spring-cloud-* dependency versions centrally.
             -->
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
@@ -45,34 +47,21 @@
 
     <dependencies>
         <!--
-            Spring Cloud Gateway (WebFlux 기반 리액티브 게이트웨이).
-            Spring Cloud Gateway — reactive gateway built on Project Reactor / WebFlux.
-            NOTE: Do NOT add spring-boot-starter-web; Gateway requires WebFlux.
-            주의: spring-boot-starter-web 추가 금지 — Gateway는 WebFlux 기반입니다.
+            Netflix Eureka Server — 서비스 레지스트리 및 디스커버리 서버 구현체.
+            Netflix Eureka Server — service registry and discovery server implementation.
         -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-gateway</artifactId>
+            <artifactId>spring-cloud-starter-netflix-eureka-server</artifactId>
         </dependency>
 
         <!--
-            Actuator — /actuator/health, /actuator/gateway/routes 등 운영 엔드포인트 제공.
-            Actuator — exposes operational endpoints such as /actuator/health and /actuator/gateway/routes.
+            Actuator — /actuator/health 등 운영 엔드포인트 제공.
+            Actuator — exposes operational endpoints such as /actuator/health.
         -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
-        </dependency>
-
-        <!--
-            Netflix Eureka Client — 이 게이트웨이를 Eureka 레지스트리(8761)에 등록하고
-            lb://rag-demo 같은 서비스 이름 기반 로드밸런싱을 활성화합니다.
-            Netflix Eureka Client — registers this gateway with the Eureka registry (8761)
-            and enables service-name-based load balancing (e.g. lb://rag-demo).
-        -->
-        <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
         </dependency>
 
         <!-- Test -->

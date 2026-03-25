@@ -5,6 +5,9 @@ server:
 spring:
   application:
     name: rag-demo
+  cloud:
+    discovery:
+      enabled: true
 
 langchain4j:
   ollama:
@@ -22,6 +25,14 @@ qdrant:
   host: localhost
   port: 6334
   collection-name: fds-documents
+
+# Eureka 클라이언트 설정 / Eureka client configuration
+eureka:
+  instance:
+    prefer-ip-address: true
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
 
 logging:
   level:

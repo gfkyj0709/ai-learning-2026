@@ -1,0 +1,50 @@
+server:
+  # Eureka 대시보드 및 REST API 수신 포트 / Port for the Eureka dashboard and REST API
+  port: 8761
+
+spring:
+  application:
+    # 서비스 레지스트리에 표시될 애플리케이션 이름 / Application name shown in the service registry
+    name: eureka-server
+
+eureka:
+  instance:
+    # 호스트명을 IP 대신 localhost로 등록 (개발 환경용)
+    # Register as localhost instead of IP address (for local development)
+    hostname: localhost
+
+  client:
+    # 자기 자신을 Eureka 레지스트리에 등록하지 않음 (서버 전용)
+    # Do not register this server itself as a Eureka client (server-only mode)
+    register-with-eureka: false
+
+    # 다른 Eureka 서버로부터 레지스트리를 가져오지 않음 (단독 스탠드얼론 모드)
+    # Do not fetch registry from peer Eureka servers (standalone mode)
+    fetch-registry: false
+
+    service-url:
+      # 자기 자신을 가리키는 기본 서비스 URL (클러스터 구성 시 피어 주소로 변경)
+      # Default service URL pointing to itself (change to peer addresses for cluster setup)
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+
+  server:
+    # 개발 환경에서 빠른 인스턴스 해제를 위해 자기 보존 모드 비활성화
+    # Disable self-preservation mode for faster instance eviction in development
+    enable-self-preservation: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # health, info 엔드포인트 노출 / Expose health and info endpoints
+        include: health,info
+  endpoint:
+    health:
+      # 헬스 체크 상세 정보 항상 표시 / Always show detailed health check information
+      show-details: always
+
+logging:
+  level:
+    # Eureka 서버 디버그 로그 / Eureka server debug logs
+    com.netflix.eureka: WARN
+    com.netflix.discovery: WARN
