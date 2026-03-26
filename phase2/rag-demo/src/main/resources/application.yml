@@ -8,6 +8,18 @@ spring:
   cloud:
     discovery:
       enabled: true
+  # ──────────────────────────────────────────────────────────────────────────
+  # Redis 설정 / Redis configuration
+  #   FDS 통계 캐싱에 사용됩니다 (캐시명: fds-stats, TTL: 1시간).
+  #   Used for FDS statistics caching (cache name: fds-stats, TTL: 1 hour).
+  # ──────────────────────────────────────────────────────────────────────────
+  data:
+    redis:
+      # Redis 서버 호스트 / Redis server host
+      host: localhost
+      # Redis 기본 포트 / Redis default port
+      port: 6379
+
   datasource:
     url: jdbc:postgresql://localhost:5432/fdsdb
     username: fds

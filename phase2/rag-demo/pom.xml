@@ -102,6 +102,15 @@
         </dependency>
 
         <!--
+            Spring Data Redis — Lettuce 클라이언트 기반 Redis 연결 및 캐싱 지원.
+            Spring Data Redis — Redis connection and caching support backed by the Lettuce client.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <!--
             PostgreSQL JDBC 드라이버 — fdsdb 데이터베이스 연결에 사용됩니다.
             PostgreSQL JDBC Driver — used to connect to the fdsdb database.
         -->

@@ -1,7 +1,7 @@
 package com.example.ragdemo.tool;
 
 import com.example.ragdemo.entity.FdsStats;
-import com.example.ragdemo.repository.FdsStatsRepository;
+import com.example.ragdemo.service.FdsStatsService;
 import dev.langchain4j.agent.tool.Tool;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -15,24 +15,26 @@ import org.springframework.stereotype.Component;
  * Methods annotated with {@code @Tool} are automatically registered as
  * callable functions by AiServices when the agent decides to use them.
  *
- * <p>PostgreSQL {@code fds_stats} 테이블에서 실제 데이터를 조회합니다.
- * Queries real data from the PostgreSQL {@code fds_stats} table via {@link FdsStatsRepository}.
+ * <p>Redis 캐시를 우선 조회하고, 미스(miss) 시에만 PostgreSQL을 조회합니다.
+ * Checks the Redis cache first; queries PostgreSQL only on a cache miss.
+ * 캐싱 로직은 {@link FdsStatsService}에 위임합니다.
+ * Caching logic is delegated to {@link FdsStatsService}.
  */
 @Component
 @RequiredArgsConstructor
 public class FdsTool {
 
     /**
-     * FDS 통계 데이터 접근을 위한 JPA 리포지토리 / JPA repository for FDS statistics data access.
+     * Redis 캐시를 통한 FDS 통계 조회 서비스 / FDS statistics service with Redis caching.
      */
-    private final FdsStatsRepository fdsStatsRepository;
+    private final FdsStatsService fdsStatsService;
 
     /**
      * Retrieves FDS detection statistics for the given year-month from the database.
      * 지정된 연월의 이상탐지 통계를 데이터베이스에서 조회합니다.
      *
-     * <p>{@code fds_stats} 테이블에서 {@code year_month} 컬럼으로 조회합니다.
-     * Queries the {@code fds_stats} table by the {@code year_month} column.
+     * <p>Redis 캐시({@code fds-stats})를 먼저 확인하고, 미스 시 PostgreSQL을 조회합니다.
+     * Checks the Redis cache ({@code fds-stats}) first; queries PostgreSQL only on a cache miss.
      * 해당 데이터가 없으면 "데이터 없음" 메시지를 반환합니다.
      * Returns a "no data" message if the record does not exist.
      *
@@ -43,7 +45,7 @@ public class FdsTool {
     @Tool("Retrieve FDS anomaly detection statistics for a given year-month (YYYYMM). " +
           "지정한 연월(YYYYMM)의 이상탐지 통계를 조회합니다.")
     public String getFdsStats(String yearMonth) {
-        return fdsStatsRepository.findByYearMonth(yearMonth)
+        return fdsStatsService.getFdsStats(yearMonth)
                 .map(this::formatStats)
                 .orElse(noDataMessage(yearMonth));
     }
@@ -64,9 +66,9 @@ public class FdsTool {
     @Tool("Compare FDS anomaly detection statistics between two months (YYYYMM). " +
           "두 연월(YYYYMM) 간 이상탐지 통계를 비교합니다.")
     public String compareFdsStats(String base, String target) {
-        // 두 연월 데이터를 DB에서 조회 / Fetch both year-month records from DB
-        FdsStats baseStats = fdsStatsRepository.findByYearMonth(base).orElse(null);
-        FdsStats targetStats = fdsStatsRepository.findByYearMonth(target).orElse(null);
+        // Redis 캐시 우선 조회, 미스 시 DB 조회 / Check Redis cache first, query DB on miss
+        FdsStats baseStats   = fdsStatsService.getFdsStats(base).orElse(null);
+        FdsStats targetStats = fdsStatsService.getFdsStats(target).orElse(null);
 
         // 어느 한쪽이라도 없으면 조기 반환 / Early return if either record is missing
         if (baseStats == null) {
