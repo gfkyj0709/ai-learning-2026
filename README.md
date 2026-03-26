@@ -935,9 +935,210 @@ curl -X POST http://localhost:8084/agent/chat \
 - Spring Cloud Gateway는 WebFlux 기반 리액티브 — `spring-boot-starter-web` 미포함
 - `/actuator/gateway/routes` 로 활성 라우팅 목록 확인 가능
 
+### 15. Spring Cloud Eureka — 서비스 디스커버리 (포트 8761)
+
+**학습일:** 2026-03-24~25
+
+#### 동작 구조
+
+```
+각 서비스 시작 시 Eureka에 자동 등록
+Gateway가 lb://서비스명 으로 Eureka에서 실제 주소 조회
+→ 하드코딩 IP 없이 서비스 이름으로 라우팅
+```
+
+#### 설정 핵심
+
+```yaml
+# eureka-server application.yml
+eureka:
+  client:
+    register-with-eureka: false  # 자기 자신은 등록 안 함
+    fetch-registry: false        # 스탠드얼론 모드
+  server:
+    enable-self-preservation: false  # 개발 환경에서 죽은 인스턴스 빠르게 해제
+```
+
+```yaml
+# 클라이언트 서비스 (rag-demo, api-gateway) application.yml
+eureka:
+  instance:
+    prefer-ip-address: true
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+```
+
+#### Gateway 라우팅 변경
+
+```yaml
+# Before (하드코딩)
+uri: http://localhost:8085
+
+# After (Eureka 서비스 디스커버리)
+uri: lb://rag-demo  # lb:// = Spring Cloud LoadBalancer
+```
+
+**학습 포인트:**
+- `lb://` 접두사로 Eureka에서 서비스 주소 자동 조회
+- rag-demo 인스턴스가 여러 개일 때 자동 로드밸런싱
+- Eureka 대시보드: `http://192.168.219.102:8761`
+
+---
+
+### 16. Spring Cloud Config Server (포트 8888)
+
+**학습일:** 2026-03-24~25
+
+#### 동작 구조
+
+```
+config-server/src/main/resources/config/
+  ├── rag-demo.yml      ← rag-demo 설정 중앙 관리
+  └── api-gateway.yml   ← api-gateway 설정 중앙 관리
+
+각 서비스가 시작 시 Config Server에서 설정 가져옴
+→ 설정 변경 시 Config Server 파일만 수정하면 됨
+```
+
+#### 설정 조회 API
+
+```bash
+curl http://localhost:8888/rag-demo/default
+curl http://localhost:8888/api-gateway/default
+```
+
+#### 기동 순서
+
+```
+1. eureka-server  (8761)
+2. config-server  (8888)
+3. rag-demo       (8085)
+4. api-gateway    (8084)
+```
+
+---
+
+### 17. PostgreSQL 연동 — FdsTool 실제 DB 조회
+
+**학습일:** 2026-03-25
+
+#### 테이블 구조
+
+```sql
+CREATE TABLE fds_stats (
+    id          BIGSERIAL PRIMARY KEY,
+    year_month  VARCHAR(6)  NOT NULL UNIQUE,
+    total_count BIGINT      NOT NULL,
+    detected    BIGINT      NOT NULL,
+    high_risk   BIGINT      NOT NULL,
+    mid_risk    BIGINT      NOT NULL,
+    low_risk    BIGINT      NOT NULL,
+    rule_based  BIGINT      NOT NULL,
+    ml_based    BIGINT      NOT NULL,
+    created_at  TIMESTAMP   NOT NULL DEFAULT NOW()
+);
+```
+
+#### 추가된 파일
+
+```
+entity/FdsStats.java           ← fds_stats 테이블 매핑 엔티티
+repository/FdsStatsRepository.java ← findByYearMonth() 메서드
+```
+
+#### 변경 사항
+
+```
+FdsTool.java
+  Before: Mock 하드코딩 데이터 반환
+  After:  FdsStatsRepository → 실제 PostgreSQL 조회
+```
+
+**학습 포인트:**
+- `ddl-auto: validate` — 엔티티와 테이블 구조 일치 여부 검증
+- `SERIAL`(INTEGER) vs `BIGSERIAL`(BIGINT) — 엔티티 타입과 DB 타입 일치 필수
+- Spring Profile별 SQL 로그 설정 분리
+
+---
+
+### 18. Redis 캐싱 — @Cacheable + FDS 통계 캐싱
+
+**학습일:** 2026-03-26
+
+#### 동작 원리
+
+```
+첫 번째 요청
+  사용자 질문 → getFdsStats("202503") 실행
+  → Cache MISS → PostgreSQL 조회
+  → 결과를 Redis에 저장 (TTL 1시간)
+  → 응답
+
+두 번째 이후 요청
+  → Cache HIT → Redis에서 바로 반환
+  → DB 조회 없음 → 응답 속도 향상
+```
+
+#### 추가된 파일
+
+```
+config/RedisConfig.java      ← RedisCacheManager TTL 1시간 설정
+service/FdsStatsService.java ← @Cacheable("fds-stats") 적용
+```
+
+#### Redis 캐시 확인
+
+```bash
+# 캐시 키 확인
+docker exec -it redis redis-cli keys "*"
+# → "fds-stats::202503"
+
+# 값 확인
+docker exec -it redis redis-cli get "fds-stats::202503"
+```
+
+#### 자료구조 5종 (개념)
+
+| 타입 | 용도 | FDS 활용 예시 |
+|------|------|--------------|
+| String | 단순 값 | 세션 토큰, 카운터 |
+| Hash | 객체 저장 | 사용자 정보 |
+| List | 순서 있는 목록 | 이상탐지 이력 |
+| Set | 중복 없는 집합 | 차단 IP 목록 |
+| ZSet | 점수 기반 정렬 | 위험도 랭킹 |
+
+**학습 포인트:**
+- `@EnableCaching` — RagDemoApplication에 추가
+- `@Cacheable("fds-stats")` — 메서드 결과 자동 캐싱
+- TTL 설정으로 캐시 자동 만료 → 데이터 정합성 유지
+
+---
+
+### 현재 서비스 구성 (2026-03-26 기준)
+
+```
+8761 eureka-server    서비스 디스커버리
+8888 config-server    중앙 설정 관리
+8085 rag-demo         RAG + Agent + Tool + PostgreSQL + Redis
+8084 api-gateway      단일 진입점 (lb://rag-demo 라우팅)
+5432 PostgreSQL       FDS 통계 데이터 (fdsdb)
+6379 Redis            통계 캐싱 (TTL 1시간)
+6333 Qdrant REST      벡터 DB
+6334 Qdrant gRPC      LangChain4j 연동
+11434 Ollama          LLM 런타임 (qwen2.5, nomic-embed-text)
+```
+
 #### 다음 세션 예정
 
-- [ ] Spring Cloud Eureka — rag-demo 서비스 등록
-- [ ] Spring Cloud Config Server — 중앙 설정 관리
-- [ ] LangGraph 실습 (Python) — FDS 워크플로우 상태 그래프
-- [ ] FdsTool 실제 DB 연결 (PostgreSQL)
+#### 완료
+- ✅ Eureka + Config Server
+- ✅ PostgreSQL 연동
+- ✅ Redis 캐싱
+
+#### 다음 세션 예정
+- [ ] GitHub Actions CI/CD
+- [ ] 무중단 배포 Blue/Green
+- [ ] LangGraph 실습 (Phase 3, Python)
+- [ ] CQRS / Outbox Pattern
+- [ ] OpenFeign / CircuitBreaker
