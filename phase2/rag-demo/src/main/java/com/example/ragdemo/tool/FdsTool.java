@@ -66,58 +66,9 @@ public class FdsTool {
     @Tool("Compare FDS anomaly detection statistics between two months (YYYYMM). " +
           "두 연월(YYYYMM) 간 이상탐지 통계를 비교합니다.")
     public String compareFdsStats(String base, String target) {
-        // Redis 캐시 우선 조회, 미스 시 DB 조회 / Check Redis cache first, query DB on miss
-        FdsStats baseStats   = fdsStatsService.getFdsStats(base).orElse(null);
-        FdsStats targetStats = fdsStatsService.getFdsStats(target).orElse(null);
-
-        // 어느 한쪽이라도 없으면 조기 반환 / Early return if either record is missing
-        if (baseStats == null) {
-            return noDataMessage(base);
-        }
-        if (targetStats == null) {
-            return noDataMessage(target);
-        }
-
-        // 탐지율 계산 (소수점 3자리) / Calculate detection rate (3 decimal places)
-        double baseDetRate   = rate(baseStats.getDetected(),   baseStats.getTotalCount());
-        double targetDetRate = rate(targetStats.getDetected(), targetStats.getTotalCount());
-
-        // 증감률 계산 (% 포인트) / Calculate change rates (% points)
-        double detectedChange   = changeRate(baseStats.getDetected(),   targetStats.getDetected());
-        double totalChange      = changeRate(baseStats.getTotalCount(), targetStats.getTotalCount());
-        double detRateChange    = changeRate((long)(baseDetRate * 1_000_000), (long)(targetDetRate * 1_000_000));
-        double ruleBasedChange  = changeRate(baseStats.getRuleBased(),  targetStats.getRuleBased());
-        double mlBasedChange    = changeRate(baseStats.getMlBased(),    targetStats.getMlBased());
-
-        return """
-                === FDS 전월 비교 보고서 | Month-over-Month Comparison ===
-                기준 월 / Base Month   : %s
-                비교 월 / Target Month : %s
-                ──────────────────────────────────────────────────
-                항목                          기준 월        비교 월        증감률
-                Item                          Base           Target         Change
-                ──────────────────────────────────────────────────
-                총 거래 건수 / Transactions  : %,d         %,d         %+.2f%%
-                탐지 건수    / Detected      : %,d         %,d         %+.2f%%
-                탐지율       / Det. Rate     : %.3f%%       %.3f%%       %+.2f%%
-                룰 기반      / Rule-based    : %,d         %,d         %+.2f%%
-                ML 기반      / ML-based      : %,d         %,d         %+.2f%%
-                ──────────────────────────────────────────────────
-                위험도 분포 (비교 월 기준) / Risk Distribution (Target Month):
-                  고위험 / High : %,d건
-                  중위험 / Mid  : %,d건
-                  저위험 / Low  : %,d건
-                """.formatted(
-                base, target,
-                baseStats.getTotalCount(),  targetStats.getTotalCount(),  totalChange,
-                baseStats.getDetected(),    targetStats.getDetected(),    detectedChange,
-                baseDetRate,                targetDetRate,                detRateChange,
-                baseStats.getRuleBased(),   targetStats.getRuleBased(),   ruleBasedChange,
-                baseStats.getMlBased(),     targetStats.getMlBased(),     mlBasedChange,
-                targetStats.getHighRisk(),
-                targetStats.getMidRisk(),
-                targetStats.getLowRisk()
-        );
+        // 비교 보고서 생성 및 캐싱은 서비스 레이어에 위임
+        // Delegate comparison report generation and caching to the service layer
+        return fdsStatsService.compareFdsStats(base, target);
     }
 
     // ──────────────────────────────────────────────────────────────────────────
