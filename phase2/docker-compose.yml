@@ -13,7 +13,7 @@ services:
       - POSTGRES_USER=fds
       - POSTGRES_PASSWORD=fds1234
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - 5d8542d3691eeeb64de74dd21830193eaf1f85421cabf24c11e0aa97cde8d584:/var/lib/postgresql/data
     restart: unless-stopped
 
   # Redis Cache
@@ -74,5 +74,6 @@ services:
 
 volumes:
   qdrant-data:
-  postgres-data:
   redis-data:
+  5d8542d3691eeeb64de74dd21830193eaf1f85421cabf24c11e0aa97cde8d584:
+    external: true
