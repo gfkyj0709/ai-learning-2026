@@ -26,7 +26,7 @@ services:
       - phase2_redis-data:/data
     restart: unless-stopped
 
-  # Qdrant Vector DB - 벡터 데이터베이스
+  # Qdrant Vector DB
   qdrant:
     image: qdrant/qdrant:latest
     container_name: qdrant
@@ -37,7 +37,7 @@ services:
       - phase2_qdrant-data:/qdrant/storage
     restart: unless-stopped
 
-  # Eureka Server - 서비스 디스커버리
+  # Eureka Server
   eureka-server:
     image: youngjinkwon/eureka-server:latest
     container_name: eureka-server
@@ -45,7 +45,7 @@ services:
       - "8761:8761"
     restart: unless-stopped
 
-  # API Gateway - 외부 요청 라우팅
+  # API Gateway
   api-gateway:
     image: youngjinkwon/api-gateway:latest
     container_name: api-gateway
@@ -55,10 +55,10 @@ services:
       - eureka-server
     restart: unless-stopped
 
-  # RAG Demo - FDS 문서 질의응답
-  rag-demo:
+  # RAG Demo Blue (기본 활성 서비스)
+  rag-demo-blue:
     image: youngjinkwon/rag-demo:latest
-    container_name: rag-demo
+    container_name: rag-demo-blue
     ports:
       - "8085:8085"
     environment:
@@ -73,6 +73,39 @@ services:
       - eureka-server
       - qdrant
       - postgres
+    restart: unless-stopped
+
+  # RAG Demo Green (새 버전 배포용 - 평소엔 중지)
+  rag-demo-green:
+    image: youngjinkwon/rag-demo:latest
+    container_name: rag-demo-green
+    ports:
+      - "8086:8085"
+    environment:
+      - OLLAMA_BASE_URL=http://192.168.219.102:11434
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/fdsdb
+      - SPRING_DATASOURCE_USERNAME=fds
+      - SPRING_DATASOURCE_PASSWORD=fds1234
+      - REDIS_HOST=redis
+      - QDRANT_HOST=qdrant
+      - EUREKA_URL=http://eureka-server:8761/eureka/
+    depends_on:
+      - eureka-server
+      - qdrant
+      - postgres
+    profiles:
+      - green
+
+  # Nginx (트래픽 라우터)
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - rag-demo-blue
     restart: unless-stopped
 
 volumes:
