@@ -2,6 +2,20 @@
 # FDS AI Assistant MSA 통합 Docker Compose
 
 services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=fdsdb
+      - POSTGRES_USER=fds
+      - POSTGRES_PASSWORD=fds1234
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
   # Qdrant Vector DB - 벡터 데이터베이스
   qdrant:
     image: qdrant/qdrant:latest
@@ -39,10 +53,15 @@ services:
       - "8085:8085"
     environment:
       - OLLAMA_BASE_URL=http://192.168.219.102:11434
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/fdsdb
+      - SPRING_DATASOURCE_USERNAME=fds
+      - SPRING_DATASOURCE_PASSWORD=fds1234
     depends_on:
       - eureka-server
       - qdrant
+      - postgres
     restart: unless-stopped
 
 volumes:
   qdrant-data:
+  postgres-data:
