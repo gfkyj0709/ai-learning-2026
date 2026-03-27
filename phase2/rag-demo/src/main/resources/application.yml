@@ -1,67 +1,53 @@
 # application.yml (기본 - 운영용)
 server:
   port: 8085
-
 spring:
   application:
     name: rag-demo
   cloud:
     discovery:
       enabled: true
-  # ──────────────────────────────────────────────────────────────────────────
-  # Redis 설정 / Redis configuration
-  #   FDS 통계 캐싱에 사용됩니다 (캐시명: fds-stats, TTL: 1시간).
-  #   Used for FDS statistics caching (cache name: fds-stats, TTL: 1 hour).
-  # ──────────────────────────────────────────────────────────────────────────
   data:
     redis:
-      # Redis 서버 호스트 / Redis server host
-      host: localhost
-      # Redis 기본 포트 / Redis default port
+      host: ${REDIS_HOST:localhost}
       port: 6379
-
   datasource:
-    url: jdbc:postgresql://localhost:5432/fdsdb
-    username: fds
-    password: fds1234
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/fdsdb}
+    username: ${SPRING_DATASOURCE_USERNAME:fds}
+    password: ${SPRING_DATASOURCE_PASSWORD:fds1234}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         show_sql: false
         format_sql: true
-
 langchain4j:
   ollama:
     chat-model:
-      base-url: http://localhost:11434
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
       model-name: qwen2.5
       temperature: 0.7
       timeout: 120s
     embedding-model:
-      base-url: http://localhost:11434
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
       model-name: nomic-embed-text
       timeout: 60s
-
 qdrant:
-  host: localhost
+  host: ${QDRANT_HOST:localhost}
   port: 6334
   collection-name: fds-documents
-
 eureka:
   instance:
     prefer-ip-address: true
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
-
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
 logging:
   level:
     root: INFO
-
 ---
 # dev 프로파일
 spring:
@@ -72,13 +58,11 @@ spring:
     properties:
       hibernate:
         show_sql: true
-
 langchain4j:
   ollama:
     chat-model:
       log-requests: true
       log-responses: true
-
 logging:
   level:
     com.example.ragdemo: DEBUG

@@ -66,6 +66,9 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/fdsdb
       - SPRING_DATASOURCE_USERNAME=fds
       - SPRING_DATASOURCE_PASSWORD=fds1234
+      - REDIS_HOST=redis
+      - QDRANT_HOST=qdrant
+      - EUREKA_URL=http://eureka-server:8761/eureka/
     depends_on:
       - eureka-server
       - qdrant
