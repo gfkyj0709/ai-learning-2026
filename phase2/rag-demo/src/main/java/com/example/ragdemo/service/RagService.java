@@ -10,6 +10,7 @@ import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.model.output.Response;
 import dev.langchain4j.rag.content.injector.DefaultContentInjector;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
@@ -86,9 +87,9 @@ public class RagService {
     public QueryResult query(String question, int maxResults) {
         log.info("질문 처리 시작: {}", question);
 
-        // 1. 질문 임베딩 (LangChain4j 1.0.0: embed() returns Embedding directly)
-        // LangChain4j 1.0.0: embed()가 Embedding을 직접 반환
-        Embedding questionEmbedding = embeddingModel.embed(question);
+        // 1. 질문 임베딩
+        Response<Embedding> embeddingResponse = embeddingModel.embed(question);
+        Embedding questionEmbedding = embeddingResponse.content();
         if (questionEmbedding == null || questionEmbedding.vector().length == 0) {
             log.error("임베딩 결과가 비어있습니다. Ollama 연결 상태를 확인해 주세요. question={}", question);
             throw new IllegalStateException("임베딩 결과가 비어있습니다. Ollama 연결 상태를 확인해 주세요. question=" + question);
