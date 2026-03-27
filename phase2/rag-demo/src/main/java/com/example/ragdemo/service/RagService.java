@@ -86,15 +86,13 @@ public class RagService {
      */
     public QueryResult query(String question, int maxResults) {
         log.info("질문 처리 시작: {}", question);
-
-        // 1. 질문 임베딩
         Response<Embedding> embeddingResponse = embeddingModel.embed(question);
         Embedding questionEmbedding = embeddingResponse.content();
         if (questionEmbedding == null || questionEmbedding.vector().length == 0) {
             log.error("임베딩 결과가 비어있습니다. Ollama 연결 상태를 확인해 주세요. question={}", question);
             throw new IllegalStateException("임베딩 결과가 비어있습니다. Ollama 연결 상태를 확인해 주세요. question=" + question);
         }
-        log.debug("임베딩 완료: {}차원", questionEmbedding.vector().length);
+        log.info("임베딩 완료: {}차원", questionEmbedding.vector().length);
 
         // 2. 유사 문서 검색
         EmbeddingSearchRequest searchRequest = EmbeddingSearchRequest.builder()
