@@ -1129,16 +1129,23 @@ docker exec -it redis redis-cli get "fds-stats::202503"
 11434 Ollama          LLM 런타임 (qwen2.5, nomic-embed-text)
 ```
 
-#### 다음 세션 예정
-
 #### 완료
 - ✅ Eureka + Config Server
 - ✅ PostgreSQL 연동
 - ✅ Redis 캐싱
+- ✅ SSH 키 등록 + alias 설정
+- ✅ Dockerfile 3개 (eureka, gateway, rag-demo)
+- ✅ 통합 docker-compose.yml
+- ✅ GitHub Secrets 설정
+- ✅ Self-hosted Runner 설치
+- ✅ GitHub Actions CI/CD 파이프라인
+- ✅ git push → 자동 빌드 → 자동 배포
+- ✅ RAG query 정상 동작
 
 #### 다음 세션 예정
-- [ ] GitHub Actions CI/CD
 - [ ] 무중단 배포 Blue/Green
 - [ ] LangGraph 실습 (Phase 3, Python)
 - [ ] CQRS / Outbox Pattern
 - [ ] OpenFeign / CircuitBreaker
+
+
