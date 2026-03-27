@@ -98,7 +98,7 @@ public class RagService {
         EmbeddingSearchRequest searchRequest = EmbeddingSearchRequest.builder()
                 .queryEmbedding(questionEmbedding)
                 .maxResults(maxResults)
-                .minScore(0.7)
+                
                 .build();
         List<EmbeddingMatch<TextSegment>> matches = embeddingStore.search(searchRequest).matches();
 
