@@ -11,9 +11,6 @@ import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.output.Response;
-import dev.langchain4j.rag.content.injector.DefaultContentInjector;
-import dev.langchain4j.store.embedding.EmbeddingMatch;
-import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import dev.langchain4j.store.embedding.EmbeddingStoreIngestor;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +34,8 @@ public class RagService {
     private final EmbeddingStore<TextSegment> embeddingStore;
 
     /**
-     * src/main/resources/docs/ 하위 .txt 파일을 읽어 청킹 후 Qdrant에 저장
+     * Ingests .txt files from src/main/resources/docs/ into Qdrant.
+     * docs/ 하위 .txt 파일을 읽어 청킹 후 Qdrant에 저장한다.
      */
     public IngestResult ingestDocuments() throws IOException {
         PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
@@ -82,19 +80,26 @@ public class RagService {
     }
 
     /**
-     * 질문을 임베딩 → Qdrant 유사 문서 검색 → LLM에 컨텍스트와 함께 질문
+     * Embeds the question, searches Qdrant via REST API, and asks the LLM with context.
+     * 질문을 임베딩 → Qdrant REST API로 유사 문서 검색 → LLM에 컨텍스트와 함께 질문
+     *
+     * @param question  User question / 사용자 질문
+     * @param maxResults Max number of similar documents / 최대 검색 문서 수
      */
     public QueryResult query(String question, int maxResults) throws Exception {
         log.info("질문 처리 시작: {}", question);
+
+        // 1. Embed the question / 질문 임베딩
         Response<Embedding> embeddingResponse = embeddingModel.embed(question);
         Embedding questionEmbedding = embeddingResponse.content();
         if (questionEmbedding == null || questionEmbedding.vector().length == 0) {
-            log.error("임베딩 결과가 비어있습니다. Ollama 연결 상태를 확인해 주세요. question={}", question);
-            throw new IllegalStateException("임베딩 결과가 비어있습니다. Ollama 연결 상태를 확인해 주세요. question=" + question);
+            log.error("임베딩 결과가 비어있습니다. question={}", question);
+            throw new IllegalStateException("임베딩 결과가 비어있습니다.");
         }
         log.info("임베딩 완료: {}차원", questionEmbedding.vector().length);
 
-        // 2. 유사 문서 검색 (Qdrant REST API 직접 호출 - LangChain4j with_vectors 버그 우회)
+        // 2. Search Qdrant via REST API (workaround for LangChain4j with_vectors bug)
+        // Qdrant REST API 직접 호출 (LangChain4j with_vectors 버그 우회)
         float[] vector = questionEmbedding.vector();
         StringBuilder vectorJson = new StringBuilder("[");
         for (int i = 0; i < vector.length; i++) {
@@ -125,6 +130,7 @@ public class RagService {
 
         log.info("Qdrant 응답 코드: {}", httpResponse.statusCode());
 
+        // 3. Parse Qdrant response / Qdrant 응답 파싱
         String responseBody = httpResponse.body();
         List<SourceInfo> sources = new ArrayList<>();
         StringBuilder contextBuilder = new StringBuilder();
@@ -151,19 +157,8 @@ public class RagService {
         }
 
         log.info("유사 문서 {}건 검색됨", sources.size());
-            EmbeddingMatch<TextSegment> match = matches.get(i);
-            TextSegment segment = match.embedded();
-            String source = segment.metadata().getString("source");
-            double score = match.score();
 
-            contextBuilder.append(String.format("[문서 %d] (출처: %s, 유사도: %.2f)\n", i + 1, source, score));
-            contextBuilder.append(segment.text());
-            contextBuilder.append("\n\n");
-
-            sources.add(new SourceInfo(source, score, segment.text()));
-        }
-
-        // 4. LLM에 RAG 프롬프트 전송 (1.0.0-beta1: generate() → chat(), Response<AiMessage> → ChatResponse)
+        // 4. Send RAG prompt to LLM / LLM에 RAG 프롬프트 전송
         String prompt = String.format("""
                 다음 참고 문서를 기반으로 질문에 답변해 주세요.
                 참고 문서에 없는 내용은 "해당 정보가 문서에 없습니다"라고 답변해 주세요.
@@ -186,8 +181,6 @@ public class RagService {
 
     // DTO records
     public record IngestResult(int fileCount, int totalChunks, String message) {}
-
     public record QueryResult(String question, String answer, List<SourceInfo> sources) {}
-
     public record SourceInfo(String filename, double score, String excerpt) {}
 }
