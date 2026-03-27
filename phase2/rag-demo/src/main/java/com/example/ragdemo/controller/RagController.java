@@ -47,7 +47,7 @@ public class RagController {
      * Body: { "question": "...", "maxResults": 3 }
      */
     @PostMapping("/query")
-    public ResponseEntity<?> query(@RequestBody QueryRequest request) {
+    public ResponseEntity<?> query(@RequestBody QueryRequest request) throws Exception {
         if (request.question() == null || request.question().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of(
                     "status", "error",
