@@ -16,6 +16,16 @@ services:
       - postgres-data:/var/lib/postgresql/data
     restart: unless-stopped
 
+  # Redis Cache
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
   # Qdrant Vector DB - 벡터 데이터베이스
   qdrant:
     image: qdrant/qdrant:latest
@@ -65,3 +75,4 @@ services:
 volumes:
   qdrant-data:
   postgres-data:
+  redis-data:
