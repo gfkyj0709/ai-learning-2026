@@ -13,7 +13,7 @@ services:
       - POSTGRES_USER=fds
       - POSTGRES_PASSWORD=fds1234
     volumes:
-      - 5d8542d3691eeeb64de74dd21830193eaf1f85421cabf24c11e0aa97cde8d584:/var/lib/postgresql/data
+      - phase2_postgres-data:/var/lib/postgresql/data
     restart: unless-stopped
 
   # Redis Cache
@@ -23,7 +23,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis-data:/data
+      - phase2_redis-data:/data
     restart: unless-stopped
 
   # Qdrant Vector DB - 벡터 데이터베이스
@@ -34,7 +34,7 @@ services:
       - "6333:6333"
       - "6334:6334"
     volumes:
-      - qdrant-data:/qdrant/storage
+      - phase2_qdrant-data:/qdrant/storage
     restart: unless-stopped
 
   # Eureka Server - 서비스 디스커버리
@@ -73,7 +73,9 @@ services:
     restart: unless-stopped
 
 volumes:
-  qdrant-data:
-  redis-data:
-  5d8542d3691eeeb64de74dd21830193eaf1f85421cabf24c11e0aa97cde8d584:
+  phase2_postgres-data:
+    external: true
+  phase2_qdrant-data:
+    external: true
+  phase2_redis-data:
     external: true
